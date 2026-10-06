@@ -13,17 +13,11 @@ SUPABASE_SECRET_KEY = os.environ.get("SUPABASE_SECRET_KEY")
 SUPABASE_PUBLISHABLE_KEY = os.environ.get("SUPABASE_PUBLISHABLE_KEY")
 
 # Standard PostgreSQL connection URL (e.g. Supabase pooler/direct, Neon, Railway, Docker, RDS)
-DATABASE_URL = (
-    os.environ.get("DATABASE_URL")
-    or os.environ.get("POSTGRES_URL")
-    or os.environ.get("POSTGRESQL_URL")
-    or os.environ.get("SUPABASE_DB_URL")
-)
+DATABASE_URL = os.environ.get("POSTGRESQL_DATABASE_URL")
 
 # Auth Configuration
 JWT_SECRET = os.environ.get("JWT_SECRET")
 JWT_ALG = "HS256"
-CORS_ORIGINS = os.environ.get("CORS_ORIGINS", "*").split(",")
 
 # System Constants
 STATUSES = ["HDR", "OFF", "SKT", "TK", "IZN", "DL"]

@@ -1,0 +1,38 @@
+name: Build & Deploy
+
+on:
+  push:
+    branches: ["master"]
+    paths:
+      - 'backend/**'
+      - 'frontend/**'
+      - '.github/workflows/ci.yml'
+      - 'vercel.json'
+  workflow_dispatch: # Allows manual trigger from GitHub UI
+
+
+jobs:
+  deploy-to-vercel:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Trigger Vercel Redeployment via Deploy Hook
+        env:
+          VERCEL_DEPLOY_HOOK: ${{ secrets.VERCEL_DEPLOY_HOOK }}
+        run: |
+          if [[ -z "$VERCEL_DEPLOY_HOOK" ]]; then
+            echo "VERCEL_DEPLOY_HOOK is not configured."
+            exit 1
+          fi
+
+          echo "Triggering Vercel deployment..."
+          HOOK_URL="${VERCEL_DEPLOY_HOOK}"
+          if [[ "$HOOK_URL" == *"?"* ]]; then
+            HOOK_URL="${HOOK_URL}&buildCache=false"
+          else
+            HOOK_URL="${HOOK_URL}?buildCache=false"
+          fi
+          curl --fail-with-body -sS -X POST "$HOOK_URL"

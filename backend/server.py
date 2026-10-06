@@ -2,7 +2,7 @@ from fastapi import FastAPI, APIRouter
 from starlette.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 
-from config import CORS_ORIGINS, logger
+from config import logger
 from database import ensure_schema
 from routers import (
     auth,
@@ -81,7 +81,7 @@ async def root():
 app.add_middleware(
     CORSMiddleware,
     allow_credentials=True,
-    allow_origins=CORS_ORIGINS,
+    allow_origins="*",
     allow_methods=["*"],
     allow_headers=["*"],
 )
