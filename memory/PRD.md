@@ -54,3 +54,9 @@ Fitur lanjutan historis (effective-date) selesai & teruji (42/42 backend tests p
 - ✅ Konfirmasi rolling + peringatan histori di UI; Riwayat perubahan anggota regu
 - Seed: komandan = anggota pertama tiap regu (2026-01-01); KASUBID1=Yosep, KASUBID2=Daud.
 - Catatan backlog: split server.py ke routers; preload sub_unit_assignments untuk perf kasubid recap.
+
+
+## Update (2026-10-06) — Akun Bersama Staff & Perbaikan Kategori Kasubid
+- ✅ **Akun bersama staff**: `staffdamkar@go.id` / `Damkar142`, role viewer (read-only: Dashboard, Kalender, Rekap Bulanan/Periode/Kasubid, Export Excel/PDF). Bisa dipakai banyak staff bersamaan (JWT stateless). Di-seed idempotent di `seed()`.
+- ✅ **Kategori Kasubid di rekap**: `_compute_recap` kini hanya memberi label "Kasubid" pada pemegang posisi kasubid yang AKTIF saat ini (resolve per posisi via `resolve_kasubid_for_date(pid, today)`, konsisten dengan halaman roster Kasubid). Mantan kasubid/penugasan historis yang sudah berakhir tampil sebagai "Staff". Terverifikasi: rekap menampilkan 1 Kasubid (Yosep Bleskadit) + 53 Staff.
+- Testing: curl login + rekap + export (200), screenshot UI login & Rekap Bulanan pass, tanpa overflow layout.

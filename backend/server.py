@@ -627,12 +627,13 @@ async def _compute_recap(start_month: str, end_month: str, team_id: Optional[str
     by_emp = await build_intervals()
     teams = {t["id"]: t for t in await db.teams.find({}, {"_id": 0}).to_list(100)}
     employees = await db.employees.find({}, {"_id": 0}).sort("no", 1).to_list(5000)
-    # kasubid employee ids active at any time during the period (category=Kasubid)
+    # hanya kasubid yang AKTIF saat ini (per posisi, resolver sama dgn roster kasubid)
+    today_str = now_iso()[:10]
     kasubid_ids = set()
-    async for a in db.sub_unit_assignments.find({"start_date": {"$lte": end_date}}):
-        if a.get("end_date") and a["end_date"] < start_date:
-            continue
-        kasubid_ids.add(a["employee_id"])
+    for pid in await db.sub_unit_assignments.distinct("position_id"):
+        eid = await resolve_kasubid_for_date(pid, today_str)
+        if eid:
+            kasubid_ids.add(eid)
     # order kasubid first, then by no
     employees.sort(key=lambda e: (e["id"] not in kasubid_ids, e["no"]))
     records = await db.attendance.find(
@@ -1694,6 +1695,15 @@ async def seed():
                 })
             elif not ex.get("employee_id"):
                 await db.users.update_one({"email": em}, {"$set": {"employee_id": link_eid}})
+
+    # akun bersama untuk semua staff: lihat dashboard + rekap + export (read-only)
+    if not await db.users.find_one({"email": "staffdamkar@go.id"}):
+        await db.users.insert_one({
+            "id": str(uuid.uuid4()), "name": "Staff DAMKAR (Bersama)",
+            "email": "staffdamkar@go.id", "password_hash": hash_password("Damkar142"),
+            "role": "viewer", "status": "ACTIVE", "employee_id": None,
+            "created_at": now_iso(),
+        })
 
     logger.info("Seeding complete")
 
