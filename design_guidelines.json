@@ -1,0 +1,179 @@
+{
+  "project_name": "Sistem Informasi Absensi Harian Dinas Pemadam Kebakaran (DAMKAR) Kabupaten Mimika",
+  "app_type": "dashboard (internal administrative SaaS app)",
+  "emotional_archetype": "ARCHETYPE 2 & 4: Tactical Performance & Indonesian Official Command Administration (Emergency Red #DC2626, Dark Navy #0F172A, Pure White #FFFFFF, Tactical Slate)",
+  "theme_strategy": {
+    "primary_dark_navy": "#0F172A",
+    "secondary_navy": "#1E293B",
+    "emergency_red": "#DC2626",
+    "emergency_red_hover": "#B91C1C",
+    "emergency_red_light": "#FEF2F2",
+    "accent_amber": "#D97706",
+    "background_light": "#F8FAFC",
+    "card_background": "#FFFFFF",
+    "border_color": "#E2E8F0",
+    "text_dark": "#0F172A",
+    "text_muted": "#64748B"
+  },
+  "attendance_category_system": {
+    "HDR": {
+      "code": "HDR",
+      "label": "Hadir",
+      "color_name": "Hijau Emerald",
+      "bg_class": "bg-emerald-100 dark:bg-emerald-950/50",
+      "text_class": "text-emerald-800 dark:text-emerald-300",
+      "border_class": "border-emerald-300 dark:border-emerald-800",
+      "badge_hex": "#16A34A",
+      "description": "Hadir piket/dinas sesuai jadwal regu"
+    },
+    "OFF": {
+      "code": "OFF",
+      "label": "Off / Libur",
+      "color_name": "Abu-abu Slate",
+      "bg_class": "bg-slate-100 dark:bg-slate-800",
+      "text_class": "text-slate-700 dark:text-slate-300",
+      "border_class": "border-slate-300 dark:border-slate-700",
+      "badge_hex": "#64748B",
+      "description": "Jadwal lepas piket / libur resmi regu"
+    },
+    "SKT": {
+      "code": "SKT",
+      "label": "Sakit",
+      "color_name": "Biru Royal",
+      "bg_class": "bg-blue-100 dark:bg-blue-950/50",
+      "text_class": "text-blue-800 dark:text-blue-300",
+      "border_class": "border-blue-300 dark:border-blue-800",
+      "badge_hex": "#2563EB",
+      "description": "Sakit dengan/tanpa surat keterangan dokter"
+    },
+    "TK": {
+      "code": "TK",
+      "label": "Tanpa Keterangan",
+      "color_name": "Merah Rose",
+      "bg_class": "bg-rose-100 dark:bg-rose-950/50",
+      "text_class": "text-rose-800 dark:text-rose-300",
+      "border_class": "border-rose-300 dark:border-rose-800",
+      "badge_hex": "#DC2626",
+      "description": "Tidak hadir tanpa konfirmasi / Alpha"
+    },
+    "IZN": {
+      "code": "IZN",
+      "label": "Izin",
+      "color_name": "Kuning Amber",
+      "bg_class": "bg-amber-100 dark:bg-amber-950/50",
+      "text_class": "text-amber-800 dark:text-amber-300",
+      "border_class": "border-amber-300 dark:border-amber-800",
+      "badge_hex": "#D97706",
+      "description": "Izin keperluan pribadi / keluarga dengan persetujuan Komandan"
+    },
+    "DL": {
+      "code": "DL",
+      "label": "Dinas Luar",
+      "color_name": "Ungu Purple",
+      "bg_class": "bg-purple-100 dark:bg-purple-950/50",
+      "text_class": "text-purple-800 dark:text-purple-300",
+      "border_class": "border-purple-300 dark:border-purple-800",
+      "badge_hex": "#9333EA",
+      "description": "Tugas luar kota / pelatihan / penyelamatan luar wilayah"
+    }
+  },
+  "typography": {
+    "font_family_heading": "Plus Jakarta Sans, Barlow, sans-serif",
+    "font_family_body": "Inter, system-ui, sans-serif",
+    "font_family_mono": "JetBrains Mono, monospace",
+    "hierarchy": {
+      "h1": "text-2xl sm:text-3xl font-bold tracking-tight text-slate-900 dark:text-slate-100",
+      "h2": "text-xl sm:text-2xl font-semibold text-slate-900 dark:text-slate-100",
+      "h3": "text-lg font-semibold text-slate-800 dark:text-slate-200",
+      "body": "text-sm text-slate-600 dark:text-slate-300 leading-relaxed",
+      "small": "text-xs font-medium text-slate-500 dark:text-slate-400"
+    }
+  },
+  "sidebar_navigation": {
+    "brand": {
+      "title": "DAMKAR MIMIKA",
+      "subtitle": "Kabupaten Mimika - Papua Tengah",
+      "logo_badge": "DISDAMKAR"
+    },
+    "links": [
+      { "id": "dashboard", "label": "Dashboard Absensi", "icon": "LayoutDashboard", "path": "/dashboard" },
+      { "id": "input-absensi", "label": "Input Absensi Harian", "icon": "ClipboardCheck", "path": "/input-absensi" },
+      { "id": "kalender", "label": "Kalender Absensi", "icon": "Calendar", "path": "/kalender" },
+      { "id": "rekap-bulanan", "label": "Rekap Bulanan", "icon": "BarChart3", "path": "/rekap-bulanan" },
+      { "id": "rekap-periode", "label": "Rekap Rentang Periode", "icon": "FileSpreadsheet", "path": "/rekap-periode" },
+      { "id": "data-pegawai", "label": "Data Pegawai", "icon": "Users", "path": "/data-pegawai" },
+      { "id": "manajemen-regu", "label": "Manajemen Regu & Rolling", "icon": "ShieldAlert", "path": "/manajemen-regu" },
+      { "id": "laporan-export", "label": "Laporan & Export Resmi", "icon": "FileDown", "path": "/laporan-export" },
+      { "id": "user-management", "label": "Manajemen User & Role", "icon": "UserCog", "path": "/user-management" },
+      { "id": "audit-log", "label": "Audit Log Aktivitas", "icon": "History", "path": "/audit-log" }
+    ]
+  },
+  "regu_structure": [
+    { "id": "regu-1", "name": "Regu I (Alpha)", "code": "R-01", "commander": "Danki Capt. Sugeng Widodo", "member_count": 14, "shift": "Piket Pagi - 24 Jam" },
+    { "id": "regu-2", "name": "Regu II (Bravo)", "code": "R-02", "commander": "Danki Capt. Yosua Murib", "member_count": 14, "shift": "Cadangan Siaga" },
+    { "id": "regu-3", "name": "Regu III (Charlie)", "code": "R-03", "commander": "Danki Capt. Hermanus Kilangin", "member_count": 13, "shift": "Lepas Piket" },
+    { "id": "regu-4", "name": "Regu IV (Delta)", "code": "R-04", "commander": "Danki Capt. FX. Tanamal", "member_count": 14, "shift": "Piket Malam" },
+    { "id": "regu-5", "name": "Regu V (Echo)", "code": "R-05", "commander": "Danki Capt. Yohanes Mako", "member_count": 12, "shift": "Penyelamatan Khusus" },
+    { "id": "regu-6", "name": "Regu VI (Foxtrot)", "code": "R-06", "commander": "Danki Capt. Markus Tabuni", "member_count": 13, "shift": "Bantuan Operasional" }
+  ],
+  "mobile_input_ux_rules": {
+    "touch_target": "Minimum 48px x 48px action buttons for status selection",
+    "batch_select": "Top toolbar with Select All / Deselect All, Regu Selector dropdown, Quick search bar, and Sticky Bottom Action Bar for batch updating selected personnel",
+    "quick_buttons": [
+      { "code": "HDR", "label": "HADIR", "class": "bg-emerald-600 hover:bg-emerald-700 text-white min-h-[48px] px-4 rounded-lg font-bold shadow-sm flex items-center justify-center" },
+      { "code": "OFF", "label": "OFF", "class": "bg-slate-600 hover:bg-slate-700 text-white min-h-[48px] px-4 rounded-lg font-bold shadow-sm flex items-center justify-center" },
+      { "code": "SKT", "label": "SAKIT", "class": "bg-blue-600 hover:bg-blue-700 text-white min-h-[48px] px-4 rounded-lg font-bold shadow-sm flex items-center justify-center" },
+      { "code": "TK", "label": "ALPHA (TK)", "class": "bg-rose-600 hover:bg-rose-700 text-white min-h-[48px] px-4 rounded-lg font-bold shadow-sm flex items-center justify-center" },
+      { "code": "IZN", "label": "IZIN", "class": "bg-amber-600 hover:bg-amber-700 text-white min-h-[48px] px-4 rounded-lg font-bold shadow-sm flex items-center justify-center" },
+      { "code": "DL", "label": "DINAS LUAR", "class": "bg-purple-600 hover:bg-purple-700 text-white min-h-[48px] px-4 rounded-lg font-bold shadow-sm flex items-center justify-center" }
+    ]
+  },
+  "roles_and_permissions": {
+    "ADMIN": "Akses penuh (Input, Edit, Rolling Regu, User Mgmt, Audit Log, Export, Delete)",
+    "OPERATOR": "Input & Edit Absensi Harian, Edit Regu Pegawai, Preview & Export Laporan",
+    "VIEWER": "Lihat Dashboard, Lihat Kalender & Rekap Absensi, Export Laporan (Read-only)"
+  },
+  "image_urls": [
+    {
+      "url": "https://images.unsplash.com/photo-1735107673395-f5c24b0cb758?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NTY2OTV8MHwxfHNlYXJjaHwzfHxmaXJlZmlnaHRlciUyMHBvcnRyYWl0JTIwcmVzY3VlfGVufDB8fHx8MTc5MTI0NjgwMnww&ixlib=rb-4.1.0&q=85",
+      "category": "hero_banner_avatar",
+      "description": "Petugas DAMKAR dengan helm keselamatan dan radio komunikasi"
+    },
+    {
+      "url": "https://images.unsplash.com/photo-1735107673023-edc0e0903672?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NTY2OTV8MHwxfHNlYXJjaHwyfHxmaXJlZmlnaHRlciUyMHBvcnRyYWl0JTIwcmVzY3VlfGVufDB8fHx8MTc5MTI0NjgwMnww&ixlib=rb-4.1.0&q=85",
+      "category": "profile_avatar",
+      "description": "Komandan Regu DAMKAR berpakaian seragam lapangan"
+    },
+    {
+      "url": "https://images.unsplash.com/photo-1614945201491-b867f6031bdd?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NTY2OTV8MHwxfHNlYXJjaHwxfHxmaXJlZmlnaHRlciUyMHBvcnRyYWl0JTIwcmVzY3VlfGVufDB8fHx8MTc5MTI0NjgwMnww&ixlib=rb-4.1.0&q=85",
+      "category": "hero_background",
+      "description": "Armada Truk Pemadam Kebakaran dan petugas siaga"
+    },
+    {
+      "url": "https://images.unsplash.com/photo-1690210795382-912d325b8c36?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NTY2OTV8MHwxfHNlYXJjaHw0fHxmaXJlZmlnaHRlciUyMHBvcnRyYWl0JTIwcmVzY3VlfGVufDB8fHx8MTc5MTI0NjgwMnww&ixlib=rb-4.1.0&q=85",
+      "category": "rescue_operations",
+      "description": "Petugas penyelamatan khusus dengan peralatan evakuasi"
+    }
+  ],
+  "export_official_kop": {
+    "header_line_1": "PEMERINTAH KABUPATEN MIMIKA",
+    "header_line_2": "DINAS PEMADAM KEBAKARAN DAN PENYELAMATAN",
+    "address": "Jl. Cenderawasih Km. 2, Timika, Papua Tengah - Kode Pos 99910",
+    "phone": "Call Center Darurat: 113 / (0901) 321113"
+  },
+  "instructions_to_main_agent": [
+    "Build a modern, interactive, high-density government administration dashboard in React.",
+    "Ensure dark navy (#0F172A) sidebar with active red indicator (#DC2626) and clean light slate body background (#F8FAFC).",
+    "Implement all 10 sidebar pages completely with rich mock data (at least 20-30 DAMKAR personnel across 6 Regu).",
+    "Ensure the Input Absensi page features multi-select checkboxes and large touch buttons suitable for smartphones and tablets.",
+    "Implement rolling assignment functionality in Regu Management with historical tracking dialog.",
+    "Include export functionality to Excel (.xlsx mock download) and PDF printable official format complete with Kop Surat Pemkab Mimika.",
+    "Use proper data-testid attributes for interactive elements (e.g. data-testid='input-absensi-batch-hdr-btn').",
+    "Integrate sonner for notifications when attendance is saved or regu is updated."
+  ],
+  "UNIVERSAL GUIDELINES FOR MAIN AGENT": {
+    "micro_interactions": "Add smooth active/hover states for all status buttons, tables, and tab switches.",
+    "accessibility": "Ensure high-contrast text on all attendance status badges.",
+    "testing_ids": "Add data-testid to all inputs, status action buttons, navigation tabs, filter dropdowns, and export triggers."
+  }
+}
