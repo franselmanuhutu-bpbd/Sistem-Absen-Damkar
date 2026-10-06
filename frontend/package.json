@@ -37,7 +37,7 @@
     "clsx": "2.1.1",
     "cmdk": "1.1.1",
     "cra-template": "1.2.0",
-    "date-fns": "4.1.0",
+    "date-fns": "3.6.0",
     "dayjs": "1.11.13",
     "embla-carousel-react": "8.6.0",
     "framer-motion": "11.18.0",
@@ -61,9 +61,8 @@
     "zod": "3.24.4"
   },
   "scripts": {
-    "build": "npm install --legacy-peer-deps && react-scripts build",
-    "start": "craco start",
     "build": "craco build",
+    "start": "craco start",
     "test": "craco test"
   },
   "browserslist": {
@@ -124,9 +123,8 @@
     "**/webpack-dev-server/ws": "8.21.0",
     "**/postcss-load-config/yaml": "2.8.3",
     "**/cosmiconfig/yaml": "1.10.3",
-    "**/cssnano/yaml": "1.10.3",
     "**/eslint/js-yaml": "4.3.2",
-    "**/@eslint/eslintrc/js-yaml": "4.3.2",
+    "**/@eslint/eslintrc/js-yaml": "3.15.2",
     "**/svgo/js-yaml": "3.15.2",
     "**/@istanbuljs/load-nyc-config/js-yaml": "3.15.2",
     "**/css-loader/postcss": "8.5.28",
