@@ -71,7 +71,7 @@ export default function Dashboard() {
       <Card className="border-slate-200 p-5">
         <h3 className="font-heading text-base font-bold text-slate-800 mb-4">Grafik Kehadiran per Regu</h3>
         <div className="h-72 w-full">
-          <ResponsiveContainer>
+          <ResponsiveContainer width="100%" height="100%" minHeight={200}>
             <BarChart data={chartData} margin={{ top: 4, right: 8, left: -16, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
               <XAxis dataKey="name" tick={{ fontSize: 12, fill: "#64748b" }} axisLine={false} tickLine={false} />
