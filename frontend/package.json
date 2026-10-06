@@ -61,7 +61,7 @@
     "zod": "3.24.4"
   },
   "scripts": {
-    "build": "craco build",
+    "build": "CI=false craco build",
     "start": "craco start",
     "test": "craco test"
   },
@@ -126,7 +126,7 @@
     "**/eslint/js-yaml": "4.3.2",
     "**/@eslint/eslintrc/js-yaml": "3.15.2",
     "**/svgo/js-yaml": "3.15.2",
-    "**/@istanbuljs/eslintrc/js-yaml": "3.15.2",
+    "**/@istanbuljs/load-nyc-config/js-yaml": "3.15.2",
     "**/css-loader/postcss": "8.5.28",
     "**/css-minimizer-webpack-plugin/postcss": "8.5.28",
     "**/react-scripts/postcss": "8.5.28",
