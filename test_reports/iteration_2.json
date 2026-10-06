@@ -1,0 +1,42 @@
+{
+  "summary": "Verified HISTORICAL STRUCTURE feature (rolling, commander, kasubid, rename, self-service, kasubid recap) end-to-end. Added /app/backend/tests/test_historical.py (16 tests) covering per-date historical regu resolution (Feb=old vs Aug=new after a mid-year roll), period-recap label 'Old → New', long-format breakdown rows per-month per-regu, overlap validation, team rename+restore, commander history (set+resolve by date), kasubid duplicate rejection, org-structure returning kasubid+commander, role access (staff cannot list users/batch/recap-kasubid; kasubid can recap-kasubid), /me/profile+/me/recap+/me/calendar+/me/assignments, and kasubid Excel+PDF export. 16/16 PASS on fresh run; 2 tests non-idempotent on re-run (commander already set, overlap already exists) which is expected given the suite mutates persistent state. Full combined backend suite: 42 tests, 40 pass on second run (idempotency only), 42/42 on first run. Frontend Playwright: Staff login shows only [Dashboard, Absensi Saya] in sidebar (no Input/Pegawai/Users/Manajemen/Audit) — correct RBAC. Absensi Saya profile shows 'Tedi Triyanto' + NIP; Rekap tab status card opens dialog listing dates with per-date regu (confirms historical); Kalender and Riwayat Regu tabs load. Kasubid user sees Rekap Kasubid, both KASUBID1 & KASUBID2 cards populated (Yosep Bleskadit / Daud R. Metaloby), Detail dialog shows daily rows with name+status. Admin dashboard shows KASUBID 1/2 strip (Soleman Luis Waroy / Daud R. Metaloby) and each Regu card shows commander star+name. Manajemen Regu exposes all required testids (team-tab-R-01..06, rename-team-btn, set-commander-btn, ks-set-KASUBID1/2, roll-btn, team-history-btn, move-btn-{id}). Rekap Periode breakdown tab renders long-format rows (162 = 54 pegawai × 3 bulan) with per-month regu columns.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "POST /api/assignments", "issue": "Overlap check only rejects when new interval truly overlaps an existing CLOSED or FUTURE interval; a new assignment whose start is AFTER an existing open assignment auto-closes the previous one (rolling semantics) — intended, but worth documenting so overlap-tests target closed intervals."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Dashboard", "issues": ["Recurring Recharts warning 'width(-1)/height(-1)' on first paint (pre-existing from iteration_1)."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_historical.py",
+    "/app/backend/tests/backend_test.py",
+    "/app/test_reports/pytest/test_historical.xml",
+    "/app/test_reports/pytest/pytest_results.xml"
+  ],
+  "action_items": [
+    "(Optional) Add minHeight/minWidth to Recharts ResponsiveContainer wrapper on Dashboard to silence width(-1)/height(-1) warnings.",
+    "(Optional) The /api/assignments overlap rule allows an incoming new assignment with a start AFTER an existing open assignment (treated as rolling, auto-closes previous). This is intentional per spec but consider documenting it in the API error message so users understand why some overlap-looking inputs succeed."
+  ],
+  "critical_code_review_comments": [
+    "server.py grew to 1654 lines — strongly consider splitting into routers (auth, users, employees, assignments, commanders, kasubid, recap, me, export, backup, audit). Historical-resolution helpers (build_intervals, resolve_team_at, resolve_commander_for_date, resolve_kasubid_for_date) are a cohesive module.",
+    "_compute_kasubid_recap iterates day-by-day calling resolve_kasubid_for_date(pid, ds) per day — fine for <1y but O(days*positions*queries). Could preload sub_unit_assignments once and resolve in-memory (same pattern as build_intervals for teams).",
+    "KasubidIn / CommanderIn / AssignmentIn should validate start_date <= end_date (currently only enforced on recap endpoints).",
+    "Overlap check in create_assignment uses the condition `a['start_date'] <= '9999-12-31'` which is always True — the intent is `a['start_date'] <= new_end`; cosmetic but confusing."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_historical.py"
+  ],
+  "success_rate": {"backend": "100% (42/42 on first run; 40/42 on re-run due to mutation idempotency only)", "frontend": "100% critical flows for the new features"},
+  "test_credentials": "admin: fransel.manuhutu@gmail.com/Damkar2026! | operator: operator@damkar.go.id/Damkar2026! | viewer: kepala@damkar.go.id/Damkar2026! | staff: staff@damkar.go.id/Damkar2026! (Tedi Triyanto, Regu 3) | kasubid: kasubid@damkar.go.id/Damkar2026! (Yosep Bleskadit, KASUBID1)",
+  "seed_data_creation": "Rolling test may roll one additional (clean, single-assignment) employee from team1 → team3 starting 2026-07-01 and record 1 HDR each at 2026-02-10 and 2026-08-10. Commander test sets a new commander for team1 effective 2026-08-01. Rename test renames last team then restores. These persist on backend; re-running the test file against the same database triggers the 2 idempotency failures noted above but is NOT a product bug.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Nav testids follow pattern `nav-{path-no-leading-slash}` e.g. nav-dashboard, nav-absensi-saya, nav-rekap-kasubid, nav-manajemen-regu, nav-rekap-periode. Rekap Periode: when a quick-period button (1/3/6/12 Bulan) is active, the start/end month inputs are disabled — click 'Custom' first before trying to fill them in Playwright. Breakdown rows selector: [data-testid^='breakdown-row-']. Dashboard literal strings are uppercase (KASUBID 1, not Kasubid 1). For historical rolling tests, pick an employee with exactly 1 existing assignment to avoid overlap errors — iterate /api/employees/{id}/assignments. Yosep Bleskadit (emp#1) already has many extra assignments from previous iterations; use member list and filter by assignment-count==1.",
+  "rca of the issue": "N/A — no production bug uncovered. The two re-run failures are test-data idempotency artifacts, not code bugs."
+}

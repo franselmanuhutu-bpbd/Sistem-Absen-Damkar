@@ -39,3 +39,18 @@ Aplikasi web administrasi absensi harian pegawai Pemadam Kebakaran (DAMKAR) Kabu
 ## Next Tasks
 - Kumpulkan feedback operator lapangan terhadap alur Input Absensi di HP.
 - Siapkan deployment online (env eksplisit, MongoDB Atlas).
+
+## Update (2026-10-06) — Struktur Historis, Komandan, Kasubid, Self-Service
+Fitur lanjutan historis (effective-date) selesai & teruji (42/42 backend tests pass):
+- ✅ **Histori per-tanggal**: `_compute_recap` kini resolve regu PER TANGGAL absensi (bukan posisi terkini). Laporan periode lama tidak berubah saat rolling. Breakdown long-format per (pegawai, regu, bulan). Label regu periode menampilkan transisi "Regu A → Regu B".
+- ✅ **Validasi**: overlap penempatan ditolak; satu pegawai satu regu aktif; Kasubid 1 ≠ Kasubid 2 pada periode sama.
+- ✅ **Rename Regu** (team_id permanen, histori aman)
+- ✅ **Komandan Regu** berbasis periode (`team_commanders`) + resolve by date + riwayat
+- ✅ **Kasubid 1 & 2** berbasis periode (`sub_unit_assignments`) + resolve by date
+- ✅ **Rekap Kasubid**: ringkasan + detail harian filter status + Export Excel (3 sheet) & PDF resmi
+- ✅ **Absensi Saya** (self-service): profil, rekap klik-status→tanggal, kalender pribadi, riwayat regu
+- ✅ **Role baru**: komandan, kasubid, staff (user ditautkan ke pegawai) + RBAC nav/route
+- ✅ **Dashboard** menampilkan Kasubid 1/2 + komandan tiap regu
+- ✅ Konfirmasi rolling + peringatan histori di UI; Riwayat perubahan anggota regu
+- Seed: komandan = anggota pertama tiap regu (2026-01-01); KASUBID1=Yosep, KASUBID2=Daud.
+- Catatan backlog: split server.py ke routers; preload sub_unit_assignments untuk perf kasubid recap.
