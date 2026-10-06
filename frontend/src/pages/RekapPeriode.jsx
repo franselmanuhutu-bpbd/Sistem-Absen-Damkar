@@ -24,6 +24,7 @@ export default function RekapPeriode() {
   const [end, setEnd] = useState(curMonth);
   const [quick, setQuick] = useState(3);
   const [teamId, setTeamId] = useState("all");
+  const [category, setCategory] = useState("all");
   const [teams, setTeams] = useState([]);
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -46,8 +47,9 @@ export default function RekapPeriode() {
     setLoading(true);
     const params = { start, end };
     if (teamId !== "all") params.team_id = teamId;
+    if (category !== "all") params.category = category;
     api.get("/recap/period", { params }).then((r) => setData(r.data)).catch((e) => toast.error(apiError(e))).finally(() => setLoading(false));
-  }, [start, end, teamId]);
+  }, [start, end, teamId, category]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -55,6 +57,7 @@ export default function RekapPeriode() {
     setExp(type);
     const params = { start, end };
     if (teamId !== "all") params.team_id = teamId;
+    if (category !== "all") params.category = category;
     try {
       if (type === "excel") {
         params.include_breakdown = true; params.include_detail = false;
@@ -111,6 +114,17 @@ export default function RekapPeriode() {
               </SelectContent>
             </Select>
           </div>
+          <div className="space-y-1.5">
+            <label className="text-sm font-medium text-slate-600">Kategori</label>
+            <Select value={category} onValueChange={setCategory}>
+              <SelectTrigger className="h-11 bg-white" data-testid="period-category"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Semua Kategori</SelectItem>
+                <SelectItem value="Staff">Staff</SelectItem>
+                <SelectItem value="Kasubid">Kasubid</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
         </div>
         <div className="flex flex-wrap items-center gap-2 border-t border-slate-100 pt-3">
           <span className="rounded-full bg-slate-100 px-3 py-1.5 text-sm font-semibold text-slate-700">
@@ -153,6 +167,7 @@ export default function RekapPeriode() {
                     <tr className="border-b bg-slate-50 text-left text-xs uppercase text-slate-500">
                       <th className="px-3 py-3">No</th><th className="px-3 py-3">NIP</th><th className="px-3 py-3">Nama</th>
                       <th className="px-3 py-3">Regu</th>
+                      <th className="px-3 py-3">Kategori</th>
                       {STATUSES.map((s) => <th key={s} className="px-2 py-3 text-center">{s}</th>)}
                       <th className="px-3 py-3 text-center">Total</th>
                     </tr>
@@ -164,6 +179,7 @@ export default function RekapPeriode() {
                         <td className="px-3 py-2.5 font-mono text-xs text-slate-500">{r.nip}</td>
                         <td className="px-3 py-2.5 font-semibold text-slate-800">{r.nama}</td>
                         <td className="px-3 py-2.5 text-slate-500">{r.regu}</td>
+                        <td className="px-3 py-2.5"><span className={`rounded px-2 py-0.5 text-xs font-semibold ${r.category === "Kasubid" ? "bg-amber-100 text-amber-700" : "bg-slate-100 text-slate-600"}`}>{r.category}</span></td>
                         {STATUSES.map((s) => <td key={s} className="px-2 py-2.5 text-center font-semibold"><span className={r[s] > 0 ? STATUS_CONFIG[s].text : "text-slate-300"}>{r[s]}</span></td>)}
                         <td className="px-3 py-2.5 text-center font-extrabold">{r.total}</td>
                       </tr>
@@ -171,7 +187,7 @@ export default function RekapPeriode() {
                   </tbody>
                   <tfoot>
                     <tr className="bg-slate-100 font-bold">
-                      <td className="px-3 py-3" colSpan={4}>TOTAL</td>
+                      <td className="px-3 py-3" colSpan={5}>TOTAL</td>
                       {STATUSES.map((s) => <td key={s} className="px-2 py-3 text-center">{g[s] ?? 0}</td>)}
                       <td className="px-3 py-3 text-center">{STATUSES.reduce((a, s) => a + (g[s] || 0), 0)}</td>
                     </tr>

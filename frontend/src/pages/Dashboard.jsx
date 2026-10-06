@@ -77,7 +77,8 @@ export default function Dashboard() {
               </div>
               <div>
                 <p className="text-xs font-bold uppercase text-slate-400">{k.label}</p>
-                <p className="font-heading text-lg font-bold text-slate-900">{k.nama || "— belum ditetapkan"}</p>
+                <p className="font-heading text-lg font-bold text-slate-900">{k.nama || "Belum Diisi / Kosong"}</p>
+                <p className="text-[11px] font-semibold" style={{ color: k.status === "Aktif" ? "#16A34A" : "#94A3B8" }}>Status: {k.status || (k.nama ? "Aktif" : "Kosong")}</p>
               </div>
             </Card>
           ))}

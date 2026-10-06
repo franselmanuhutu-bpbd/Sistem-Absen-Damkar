@@ -5,13 +5,14 @@ import { ROLE_LABEL } from "@/lib/constants";
 import {
   LayoutDashboard, ClipboardCheck, Calendar, BarChart3, FileSpreadsheet,
   Users, ShieldAlert, FileDown, UserCog, History, Menu, X, LogOut, Flame,
-  UserCircle, Star,
+  UserCircle, Star, Settings,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 const NAV = [
   { label: "Dashboard", icon: LayoutDashboard, path: "/dashboard", roles: ["admin", "operator", "viewer", "komandan", "kasubid", "staff"] },
-  { label: "Input Absensi", icon: ClipboardCheck, path: "/input-absensi", roles: ["admin", "operator"] },
+  { label: "Absensi Staff", icon: ClipboardCheck, path: "/input-absensi", roles: ["admin", "operator"] },
+  { label: "Absensi Kasubid", icon: Star, path: "/absensi-kasubid", roles: ["admin", "operator"] },
   { label: "Absensi Saya", icon: UserCircle, path: "/absensi-saya", roles: ["staff", "kasubid", "komandan", "operator"] },
   { label: "Kalender Absensi", icon: Calendar, path: "/kalender", roles: ["admin", "operator", "viewer"] },
   { label: "Rekap Bulanan", icon: BarChart3, path: "/rekap-bulanan", roles: ["admin", "operator", "viewer", "kasubid", "komandan"] },
@@ -19,6 +20,7 @@ const NAV = [
   { label: "Rekap Kasubid", icon: Star, path: "/rekap-kasubid", roles: ["admin", "operator", "viewer", "kasubid"] },
   { label: "Data Pegawai", icon: Users, path: "/data-pegawai", roles: ["admin", "operator"] },
   { label: "Manajemen Regu", icon: ShieldAlert, path: "/manajemen-regu", roles: ["admin", "operator"] },
+  { label: "Pengaturan Kasubid", icon: Settings, path: "/pengaturan-kasubid", roles: ["admin"] },
   { label: "Laporan & Export", icon: FileDown, path: "/laporan-export", roles: ["admin", "operator", "viewer"] },
   { label: "User Management", icon: UserCog, path: "/user-management", roles: ["admin"] },
   { label: "Audit Log", icon: History, path: "/audit-log", roles: ["admin"] },
@@ -112,7 +114,7 @@ export function Layout({ children }) {
               {current?.label || "DAMKAR"}
             </h1>
             <p className="hidden text-xs text-slate-500 sm:block mt-0.5">
-              Dinas Pemadam Kebakaran & Penyelamatan — Kab. Mimika
+              BPBD Kab. Mimika — Bidang Pemadam Kebakaran
             </p>
           </div>
           <div className="ml-auto hidden items-center gap-2 rounded-full bg-slate-100 px-3 py-1.5 sm:flex">

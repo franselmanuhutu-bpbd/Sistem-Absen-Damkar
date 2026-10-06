@@ -23,6 +23,7 @@ export default function LaporanExport() {
   const [start, setStart] = useState(addMonths(curMonth, -2));
   const [end, setEnd] = useState(curMonth);
   const [teamId, setTeamId] = useState("all");
+  const [category, setCategory] = useState("all");
   const [sections, setSections] = useState({ summary: true, breakdown: true, detail: false });
   const [exp, setExp] = useState("");
 
@@ -31,6 +32,7 @@ export default function LaporanExport() {
   const params = () => {
     const p = { start, end };
     if (teamId !== "all") p.team_id = teamId;
+    if (category !== "all") p.category = category;
     return p;
   };
 
@@ -89,6 +91,17 @@ export default function LaporanExport() {
                 <SelectContent>
                   <SelectItem value="all">Semua Regu</SelectItem>
                   {teams.map((t) => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Kategori</Label>
+              <Select value={category} onValueChange={setCategory}>
+                <SelectTrigger className="h-11" data-testid="lap-category"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Semua Kategori</SelectItem>
+                  <SelectItem value="Staff">Staff</SelectItem>
+                  <SelectItem value="Kasubid">Kasubid</SelectItem>
                 </SelectContent>
               </Select>
             </div>

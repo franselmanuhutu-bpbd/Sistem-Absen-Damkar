@@ -11,6 +11,8 @@ import RekapBulanan from "@/pages/RekapBulanan";
 import RekapPeriode from "@/pages/RekapPeriode";
 import RekapKasubid from "@/pages/RekapKasubid";
 import AbsensiSaya from "@/pages/AbsensiSaya";
+import AbsensiKasubid from "@/pages/AbsensiKasubid";
+import PengaturanKasubid from "@/pages/PengaturanKasubid";
 import DataPegawai from "@/pages/DataPegawai";
 import ManajemenRegu from "@/pages/ManajemenRegu";
 import LaporanExport from "@/pages/LaporanExport";
@@ -39,6 +41,8 @@ function App() {
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
           <Route path="/dashboard" element={<Protected><Dashboard /></Protected>} />
           <Route path="/input-absensi" element={<Protected roles={["admin", "operator"]}><InputAbsensi /></Protected>} />
+          <Route path="/absensi-kasubid" element={<Protected roles={["admin", "operator"]}><AbsensiKasubid /></Protected>} />
+          <Route path="/pengaturan-kasubid" element={<Protected roles={["admin"]}><PengaturanKasubid /></Protected>} />
           <Route path="/kalender" element={<Protected><Kalender /></Protected>} />
           <Route path="/rekap-bulanan" element={<Protected><RekapBulanan /></Protected>} />
           <Route path="/rekap-periode" element={<Protected><RekapPeriode /></Protected>} />

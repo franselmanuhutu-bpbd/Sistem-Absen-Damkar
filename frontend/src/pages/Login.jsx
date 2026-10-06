@@ -60,12 +60,12 @@ export default function Login() {
           </h2>
           <p className="mt-4 max-w-md text-slate-300">
             Administrasi absensi pegawai Pemadam Kebakaran berbasis regu, rekap bulanan &amp; periode,
-            serta export laporan resmi.
+            serta export laporan resmi BPBD Kabupaten Mimika.
           </p>
         </div>
         <div className="relative flex items-center gap-2 text-sm text-slate-400">
           <ShieldCheck className="h-4 w-4" />
-          Dinas Pemadam Kebakaran &amp; Penyelamatan — Kab. Mimika
+          Badan Penanggulangan Bencana Daerah — Kab. Mimika
         </div>
       </div>
 
