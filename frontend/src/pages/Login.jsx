@@ -117,14 +117,6 @@ export default function Login() {
               {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : "Masuk"}
             </Button>
           </form>
-
-          <div className="mt-6 rounded-lg border border-slate-200 bg-white p-4 text-xs text-slate-500">
-            <p className="font-semibold text-slate-700 mb-1">Akun demo:</p>
-            <p>Admin: fransel.manuhutu@gmail.com</p>
-            <p>Operator: operator@damkar.go.id</p>
-            <p>Kepala: kepala@damkar.go.id</p>
-            <p className="mt-1">Password semua: <span className="font-mono">Damkar2026!</span></p>
-          </div>
         </div>
       </div>
     </div>
