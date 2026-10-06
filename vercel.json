@@ -1,13 +1,19 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
+  "version": 2,
+  "git": {
+    "deploymentEnabled": {
+      "main": false,
+      "master": false
+    }
+  },
   "services": {
     "backend": {
       "root": "backend",
       "framework": "fastapi"
     },
     "frontend": {
-      "root": "frontend",
-      "framework": "create-react-app"
+      "root": "frontend"
     }
   },
   "rewrites": [
