@@ -17,4 +17,4 @@ export function monthLabel(ym) {
   return `${MONTH_NAMES[parseInt(m) - 1]} ${y}`;
 }
 
-export const ROLE_LABEL = { admin: "Administrator", operator: "Operator", viewer: "Viewer / Kepala" };
+export const ROLE_LABEL = { admin: "Administrator", operator: "Operator", viewer: "Viewer / Kepala", komandan: "Komandan Regu", kasubid: "Kasubid", staff: "Pegawai / Staff" };

@@ -5,15 +5,18 @@ import { ROLE_LABEL } from "@/lib/constants";
 import {
   LayoutDashboard, ClipboardCheck, Calendar, BarChart3, FileSpreadsheet,
   Users, ShieldAlert, FileDown, UserCog, History, Menu, X, LogOut, Flame,
+  UserCircle, Star,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 const NAV = [
-  { label: "Dashboard", icon: LayoutDashboard, path: "/dashboard", roles: ["admin", "operator", "viewer"] },
+  { label: "Dashboard", icon: LayoutDashboard, path: "/dashboard", roles: ["admin", "operator", "viewer", "komandan", "kasubid", "staff"] },
   { label: "Input Absensi", icon: ClipboardCheck, path: "/input-absensi", roles: ["admin", "operator"] },
+  { label: "Absensi Saya", icon: UserCircle, path: "/absensi-saya", roles: ["staff", "kasubid", "komandan", "operator"] },
   { label: "Kalender Absensi", icon: Calendar, path: "/kalender", roles: ["admin", "operator", "viewer"] },
-  { label: "Rekap Bulanan", icon: BarChart3, path: "/rekap-bulanan", roles: ["admin", "operator", "viewer"] },
-  { label: "Rekap Periode", icon: FileSpreadsheet, path: "/rekap-periode", roles: ["admin", "operator", "viewer"] },
+  { label: "Rekap Bulanan", icon: BarChart3, path: "/rekap-bulanan", roles: ["admin", "operator", "viewer", "kasubid", "komandan"] },
+  { label: "Rekap Periode", icon: FileSpreadsheet, path: "/rekap-periode", roles: ["admin", "operator", "viewer", "kasubid"] },
+  { label: "Rekap Kasubid", icon: Star, path: "/rekap-kasubid", roles: ["admin", "operator", "viewer", "kasubid"] },
   { label: "Data Pegawai", icon: Users, path: "/data-pegawai", roles: ["admin", "operator"] },
   { label: "Manajemen Regu", icon: ShieldAlert, path: "/manajemen-regu", roles: ["admin", "operator"] },
   { label: "Laporan & Export", icon: FileDown, path: "/laporan-export", roles: ["admin", "operator", "viewer"] },

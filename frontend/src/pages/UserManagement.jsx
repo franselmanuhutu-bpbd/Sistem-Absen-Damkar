@@ -15,10 +15,11 @@ import { toast } from "sonner";
 export default function UserManagement() {
   const { user } = useAuth();
   const [users, setUsers] = useState([]);
+  const [employees, setEmployees] = useState([]);
   const [form, setForm] = useState(null);
 
   const load = () => api.get("/users").then((r) => setUsers(r.data));
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); api.get("/employees", { params: { status: "ACTIVE" } }).then((r) => setEmployees(r.data)); }, []);
 
   const save = async () => {
     try {
@@ -43,7 +44,7 @@ export default function UserManagement() {
           <h2 className="font-heading text-2xl font-bold text-slate-900">Manajemen User &amp; Role</h2>
           <p className="text-sm text-slate-500">{users.length} user terdaftar</p>
         </div>
-        <Button onClick={() => setForm({ name: "", email: "", password: "", role: "operator", status: "ACTIVE" })} className="gap-2 bg-red-600 hover:bg-red-700" data-testid="add-user-btn">
+        <Button onClick={() => setForm({ name: "", email: "", password: "", role: "operator", status: "ACTIVE", employee_id: "" })} className="gap-2 bg-red-600 hover:bg-red-700" data-testid="add-user-btn">
           <UserPlus className="h-4 w-4" /> Tambah User
         </Button>
       </div>
@@ -67,7 +68,7 @@ export default function UserManagement() {
                   <td className="px-4 py-3"><Badge className={u.status === "ACTIVE" ? "bg-emerald-100 text-emerald-700" : "bg-slate-200 text-slate-600"}>{u.status === "ACTIVE" ? "Aktif" : "Nonaktif"}</Badge></td>
                   <td className="px-4 py-3">
                     <div className="flex justify-end gap-1">
-                      <Button size="icon" variant="ghost" onClick={() => setForm({ ...u, password: "" })} data-testid={`edit-user-${u.id}`}><Pencil className="h-4 w-4 text-slate-500" /></Button>
+                      <Button size="icon" variant="ghost" onClick={() => setForm({ ...u, password: "", employee_id: u.employee_id || "" })} data-testid={`edit-user-${u.id}`}><Pencil className="h-4 w-4 text-slate-500" /></Button>
                       {u.id !== user.id && <Button size="icon" variant="ghost" onClick={() => deactivate(u)} data-testid={`deactivate-user-${u.id}`}><Power className="h-4 w-4 text-rose-500" /></Button>}
                     </div>
                   </td>
@@ -95,6 +96,9 @@ export default function UserManagement() {
                       <SelectItem value="admin">Administrator</SelectItem>
                       <SelectItem value="operator">Operator</SelectItem>
                       <SelectItem value="viewer">Viewer / Kepala</SelectItem>
+                      <SelectItem value="komandan">Komandan Regu</SelectItem>
+                      <SelectItem value="kasubid">Kasubid</SelectItem>
+                      <SelectItem value="staff">Pegawai / Staff</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -108,6 +112,16 @@ export default function UserManagement() {
                     </SelectContent>
                   </Select>
                 </div>
+              </div>
+              <div className="space-y-1.5">
+                <Label>Tautkan ke Pegawai <span className="text-xs text-slate-400">(wajib untuk role Staff/Kasubid/Komandan agar bisa lihat "Absensi Saya")</span></Label>
+                <Select value={form.employee_id || "none"} onValueChange={(v) => setForm({ ...form, employee_id: v === "none" ? "" : v })}>
+                  <SelectTrigger data-testid="user-employee"><SelectValue placeholder="Tidak ditautkan" /></SelectTrigger>
+                  <SelectContent className="max-h-64">
+                    <SelectItem value="none">Tidak ditautkan</SelectItem>
+                    {employees.map((e) => <SelectItem key={e.id} value={e.id}>{e.nama} — {e.nip}</SelectItem>)}
+                  </SelectContent>
+                </Select>
               </div>
             </div>
           )}

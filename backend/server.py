@@ -172,12 +172,16 @@ class EmployeeIn(BaseModel):
     jabatan: str = ""
 
 
+ALLOWED_ROLES = ("admin", "operator", "viewer", "komandan", "kasubid", "staff")
+
+
 class UserIn(BaseModel):
     name: str
     email: EmailStr
     password: Optional[str] = None
     role: str = "operator"
     status: str = "ACTIVE"
+    employee_id: Optional[str] = None
 
 
 class AssignmentIn(BaseModel):
@@ -236,7 +240,7 @@ async def create_user(body: UserIn, user: dict = Depends(require_roles("admin"))
         raise HTTPException(status_code=400, detail="Email sudah terdaftar")
     if not body.password:
         raise HTTPException(status_code=400, detail="Password wajib diisi")
-    if body.role not in ("admin", "operator", "viewer"):
+    if body.role not in ALLOWED_ROLES:
         raise HTTPException(status_code=400, detail="Role tidak valid")
     doc = {
         "id": str(uuid.uuid4()),
@@ -245,6 +249,7 @@ async def create_user(body: UserIn, user: dict = Depends(require_roles("admin"))
         "password_hash": hash_password(body.password),
         "role": body.role,
         "status": "ACTIVE",
+        "employee_id": body.employee_id or None,
         "created_at": now_iso(),
     }
     await db.users.insert_one(doc)
@@ -257,7 +262,8 @@ async def update_user(uid: str, body: UserIn, user: dict = Depends(require_roles
     existing = await db.users.find_one({"id": uid})
     if not existing:
         raise HTTPException(status_code=404, detail="User tidak ditemukan")
-    update = {"name": body.name, "role": body.role, "status": body.status, "email": body.email.lower().strip()}
+    update = {"name": body.name, "role": body.role, "status": body.status,
+              "email": body.email.lower().strip(), "employee_id": body.employee_id or None}
     if body.password:
         update["password_hash"] = hash_password(body.password)
     await db.users.update_one({"id": uid}, {"$set": update})
@@ -417,12 +423,24 @@ async def create_assignment(body: AssignmentIn, user: dict = Depends(require_rol
     team = await db.teams.find_one({"id": body.team_id})
     if not emp or not team:
         raise HTTPException(status_code=404, detail="Pegawai / Regu tidak ditemukan")
-    # close open assignments that start before the new start
-    open_ones = db.team_assignments.find({"employee_id": body.employee_id, "end_date": None})
+    # ---- Overlap validation (satu pegawai satu regu aktif per tanggal) ----
+    new_start = body.start_date
+    new_end = body.end_date or "9999-12-31"
+    existing = await db.team_assignments.find({"employee_id": body.employee_id}, {"_id": 0}).to_list(1000)
     prev_day = (_date.fromisoformat(body.start_date) - timedelta(days=1)).isoformat()
-    async for a in open_ones:
-        if a["start_date"] < body.start_date:
-            await db.team_assignments.update_one({"id": a["id"]}, {"$set": {"end_date": prev_day}})
+    for a in existing:
+        a_end = a.get("end_date") or "9999-12-31"
+        # open assignment starting before new start -> will be auto-closed (rolling), OK
+        if a.get("end_date") is None and a["start_date"] < new_start:
+            continue
+        # otherwise must not overlap
+        if a["start_date"] <= new_end and a_end >= new_start:
+            raise HTTPException(status_code=400,
+                detail="Periode penempatan bertabrakan dengan assignment yang sudah ada. Perbaiki tanggal.")
+    # close open assignments that start before the new start
+    for a in existing:
+        if a.get("end_date") is None and a["start_date"] < new_start:
+            await db.team_assignments.update_one({"id": a["id"]}, {"$set": {"end_date": prev_day, "updated_at": now_iso()}})
     doc = {
         "id": str(uuid.uuid4()),
         "employee_id": body.employee_id,
@@ -527,63 +545,137 @@ async def dashboard(date: str = None, user: dict = Depends(get_current_user)):
             totals[st] += 1
             if tid in per_team:
                 per_team[tid][st] += 1
+    # org structure (historical per ref date)
+    kasubid = []
+    for pid, plabel in [("KASUBID1", "Kasubid 1"), ("KASUBID2", "Kasubid 2")]:
+        eid = await resolve_kasubid_for_date(pid, ref)
+        emp = await db.employees.find_one({"id": eid}, {"_id": 0}) if eid else None
+        kasubid.append({"position_id": pid, "label": plabel, "employee_id": eid,
+                        "nama": emp["nama"] if emp else None})
+    for t in per_team.values():
+        cid = await resolve_commander_for_date(t["team"]["id"], ref)
+        cemp = await db.employees.find_one({"id": cid}, {"_id": 0}) if cid else None
+        t["commander_id"] = cid
+        t["commander_name"] = cemp["nama"] if cemp else None
     return {
         "date": ref,
         "total_employees": total_employees,
         "totals": totals,
         "per_team": list(per_team.values()),
+        "kasubid": kasubid,
     }
 
 
 # ---------------------------------------------------------------------------
 # Recap computation
 # ---------------------------------------------------------------------------
+async def build_intervals():
+    all_a = await db.team_assignments.find({}, {"_id": 0}).to_list(100000)
+    by_emp = {}
+    for a in all_a:
+        by_emp.setdefault(a["employee_id"], []).append(a)
+    return by_emp
+
+
+def resolve_team_at(by_emp, eid, date):
+    best = None
+    for a in by_emp.get(eid, []):
+        if a["start_date"] <= date and (not a.get("end_date") or a["end_date"] >= date):
+            if best is None or a["start_date"] > best["start_date"]:
+                best = a
+    return best["team_id"] if best else None
+
+
+async def resolve_commander_for_date(team_id, date):
+    best = None
+    async for a in db.team_commanders.find({"team_id": team_id, "start_date": {"$lte": date}}):
+        if a.get("end_date") and a["end_date"] < date:
+            continue
+        if best is None or a["start_date"] > best["start_date"]:
+            best = a
+    return best["employee_id"] if best else None
+
+
+async def resolve_kasubid_for_date(position_id, date):
+    best = None
+    async for a in db.sub_unit_assignments.find({"position_id": position_id, "start_date": {"$lte": date}}):
+        if a.get("end_date") and a["end_date"] < date:
+            continue
+        if best is None or a["start_date"] > best["start_date"]:
+            best = a
+    return best["employee_id"] if best else None
+
+
 async def _compute_recap(start_month: str, end_month: str, team_id: Optional[str]):
+    """HISTORICAL recap: regu pegawai ditentukan per TANGGAL absensi (bukan posisi terkini)."""
     months = month_range(start_month, end_month)
     start_date = f"{start_month}-01"
     ey, em = int(end_month[:4]), int(end_month[5:7])
     end_date = f"{end_month}-{last_day_of_month(ey, em):02d}"
-    # team resolution representative = last day of end month
-    team_map = await resolve_teams_for_date(end_date)
+    by_emp = await build_intervals()
     teams = {t["id"]: t for t in await db.teams.find({}, {"_id": 0}).to_list(100)}
     employees = await db.employees.find({}, {"_id": 0}).sort("no", 1).to_list(5000)
     records = await db.attendance.find(
         {"date": {"$gte": start_date, "$lte": end_date}}, {"_id": 0}
-    ).to_list(200000)
+    ).to_list(500000)
 
-    # per employee totals + breakdown per month
-    totals_by_emp = {e["id"]: {s: 0 for s in STATUSES} for e in employees}
-    breakdown = {e["id"]: {m: {s: 0 for s in STATUSES} for m in months} for e in employees}
+    emp_status = {}            # eid -> {status: count}
+    emp_team_first = {}        # (eid, tid) -> earliest date
+    mt = {}                    # (eid, tid, month) -> {status: count}
+    present = set()
     for r in records:
-        eid = r["employee_id"]
         st = r["status"]
-        mo = r["date"][:7]
-        if eid in totals_by_emp and st in STATUSES:
-            totals_by_emp[eid][st] += 1
-            if mo in breakdown[eid]:
-                breakdown[eid][mo][st] += 1
-
-    rows = []
-    grand = {s: 0 for s in STATUSES}
-    for e in employees:
-        tid = team_map.get(e["id"])
+        if st not in STATUSES:
+            continue
+        eid = r["employee_id"]
+        d = r["date"]
+        tid = resolve_team_at(by_emp, eid, d)   # <-- per-date historical regu
         if team_id and tid != team_id:
             continue
-        t = totals_by_emp[e["id"]]
-        total = sum(t.values())
-        if total == 0 and e.get("status") == "INACTIVE":
+        present.add(eid)
+        emp_status.setdefault(eid, {s: 0 for s in STATUSES})[st] += 1
+        k = (eid, tid)
+        if k not in emp_team_first or d < emp_team_first[k]:
+            emp_team_first[k] = d
+        mk = (eid, tid, d[:7])
+        mt.setdefault(mk, {s: 0 for s in STATUSES})[st] += 1
+
+    rows = []
+    breakdown = []
+    grand = {s: 0 for s in STATUSES}
+    for e in employees:
+        eid = e["id"]
+        if team_id and eid not in present:
             continue
+        if not team_id and e.get("status") == "INACTIVE" and eid not in present:
+            continue
+        counts = emp_status.get(eid, {s: 0 for s in STATUSES})
+        total = sum(counts.values())
+        seen = sorted([(k[1], emp_team_first[k]) for k in emp_team_first if k[0] == eid], key=lambda x: x[1])
+        team_ids_ordered = [t for t, _ in seen]
+        if team_ids_ordered:
+            regu_label = " → ".join(teams.get(t, {}).get("name", "-") for t in team_ids_ordered)
+        else:
+            tid_now = resolve_team_at(by_emp, eid, end_date)
+            regu_label = teams.get(tid_now, {}).get("name", "-") if tid_now else "-"
         for s in STATUSES:
-            grand[s] += t[s]
+            grand[s] += counts[s]
         rows.append({
-            "employee_id": e["id"], "no": e["no"], "nip": e["nip"], "nama": e["nama"],
+            "employee_id": eid, "no": e["no"], "nip": e["nip"], "nama": e["nama"],
             "jabatan": e["jabatan"], "pangkat": e["pangkat"],
-            "team_id": tid, "regu": teams.get(tid, {}).get("name") if tid else "-",
-            **t, "total": total,
-            "breakdown": {m: breakdown[e["id"]][m] for m in months},
+            "team_ids": team_ids_ordered, "regu": regu_label,
+            **counts, "total": total,
         })
+        emp_breaks = sorted([(k, v) for k, v in mt.items() if k[0] == eid], key=lambda kv: (kv[0][2], kv[0][1]))
+        for (ee, tid, mo), cc in emp_breaks:
+            breakdown.append({
+                "employee_id": eid, "no": e["no"], "nip": e["nip"], "nama": e["nama"],
+                "team_id": tid, "regu": teams.get(tid, {}).get("name", "-"),
+                "month": mo, "month_label": _month_label(mo),
+                **cc, "total": sum(cc.values()),
+            })
     return {
-        "months": months, "rows": rows, "grand_total": grand,
+        "months": months, "rows": rows, "breakdown": breakdown, "grand_total": grand,
         "total_pegawai": len(rows),
         "period_label": _period_label(start_month, end_month),
     }
@@ -773,30 +865,24 @@ async def export_excel(
     ws.freeze_panes = ws.cell(row=hr + 1, column=1)
     ws.auto_filter.ref = f"A{hr}:{get_column_letter(len(cols))}{hr}"
 
-    # ---- Sheet 2: Breakdown Bulanan ----
-    if include_breakdown and len(data["months"]) > 0:
+    # ---- Sheet 2: Breakdown Bulanan (historical, long format) ----
+    if include_breakdown and len(data["breakdown"]) > 0:
         wb2 = wb.create_sheet("Breakdown Bulanan")
-        bcols = ["No", "Nama", "Regu"]
-        for m in data["months"]:
-            for s in STATUSES:
-                bcols.append(f"{_month_label(m).split()[0][:3]} {s}")
-        bcols.append("Total")
+        bcols = ["No", "Nama", "Regu", "Bulan"] + STATUSES + ["Total"]
         for i, c in enumerate(bcols, 1):
             wb2.cell(row=1, column=i, value=c)
         style_header(wb2, 1, len(bcols))
         rr = 2
-        for row in data["rows"]:
-            vals = [row["no"], row["nama"], row["regu"]]
-            for m in data["months"]:
-                for s in STATUSES:
-                    vals.append(row["breakdown"][m][s])
-            vals.append(row["total"])
+        for b in data["breakdown"]:
+            vals = [b["no"], b["nama"], b["regu"], b["month_label"]] + [b[s] for s in STATUSES] + [b["total"]]
             for i, v in enumerate(vals, 1):
                 c = wb2.cell(row=rr, column=i, value=v)
                 c.border = border
+                if 5 <= i <= 10:
+                    c.alignment = center
             rr += 1
         autofit(wb2, len(bcols))
-        wb2.freeze_panes = "D2"
+        wb2.freeze_panes = "E2"
 
     # ---- Sheet 3: Detail Absensi ----
     if include_detail:
@@ -945,31 +1031,29 @@ async def export_pdf(
         t.setStyle(TableStyle(ts))
         elements.append(t)
 
-    if include_breakdown and len(data["months"]) > 0:
-        elements.append(Paragraph("BREAKDOWN BULANAN", sec_style))
-        header = ["Nama", "Regu"]
-        for m in data["months"]:
-            for s in STATUSES:
-                header.append(f"{_month_label(m).split()[0][:3]}\n{s}")
+    if include_breakdown and len(data["breakdown"]) > 0:
+        elements.append(Paragraph("BREAKDOWN BULANAN (mengikuti histori regu per bulan)", sec_style))
+        header = ["No", "Nama", "Regu", "Bulan"] + STATUSES + ["Total"]
         bd = [header]
-        for row in data["rows"]:
-            vals = [Paragraph(str(row["nama"]), styles["BodyText"]), row["regu"]]
-            for m in data["months"]:
-                for s in STATUSES:
-                    vals.append(row["breakdown"][m][s])
-            bd.append(vals)
-        nmonth = len(data["months"])
-        colw = [45 * mm, 18 * mm] + [((page[0] - 24 * mm - 63 * mm) / (nmonth * 6))] * (nmonth * 6)
+        for b in data["breakdown"]:
+            bd.append([b["no"], Paragraph(str(b["nama"]), styles["BodyText"]), b["regu"], b["month_label"]]
+                      + [b[s] for s in STATUSES] + [b["total"]])
+        colw = [10 * mm, 60 * mm, 28 * mm, 34 * mm] + [15 * mm] * 6 + [15 * mm]
         t = Table(bd, colWidths=colw, repeatRows=1)
-        t.setStyle(TableStyle([
+        ts = [
             ("GRID", (0, 0), (-1, -1), 0.4, colors.HexColor("#94A3B8")),
             ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#1E293B")),
             ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
             ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-            ("FONTSIZE", (0, 0), (-1, -1), 6.5),
-            ("ALIGN", (1, 0), (-1, -1), "CENTER"),
+            ("FONTSIZE", (0, 0), (-1, -1), 7),
+            ("ALIGN", (4, 0), (-1, -1), "CENTER"),
+            ("ALIGN", (0, 0), (0, -1), "CENTER"),
             ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-        ]))
+        ]
+        for i, s in enumerate(STATUSES):
+            ts.append(("TEXTCOLOR", (4 + i, 1), (4 + i, -1), status_colors[s]))
+            ts.append(("FONTNAME", (4 + i, 1), (4 + i, -1), "Helvetica-Bold"))
+        t.setStyle(TableStyle(ts))
         elements.append(t)
 
     if include_detail:
@@ -1007,6 +1091,406 @@ async def export_pdf(
 
 
 # ---------------------------------------------------------------------------
+# Team rename, Commanders, Kasubid, Org structure, Team detail/history
+# ---------------------------------------------------------------------------
+class TeamRenameIn(BaseModel):
+    name: str
+
+
+class CommanderIn(BaseModel):
+    team_id: str
+    employee_id: str
+    start_date: str
+
+
+class KasubidIn(BaseModel):
+    position_id: str
+    employee_id: str
+    start_date: str
+
+
+KASUBID_POSITIONS = [("KASUBID1", "Kasubid 1"), ("KASUBID2", "Kasubid 2")]
+
+
+@api.put("/teams/{team_id}/rename")
+async def rename_team(team_id: str, body: TeamRenameIn, user: dict = Depends(require_roles("admin"))):
+    team = await db.teams.find_one({"id": team_id})
+    if not team:
+        raise HTTPException(status_code=404, detail="Regu tidak ditemukan")
+    old = team["name"]
+    await db.teams.update_one({"id": team_id}, {"$set": {"name": body.name}})
+    await write_audit(user, "Rename regu", detail=f"{old} → {body.name}")
+    return {"ok": True}
+
+
+@api.get("/teams/{team_id}/commanders")
+async def commander_history(team_id: str, user: dict = Depends(get_current_user)):
+    rows = await db.team_commanders.find({"team_id": team_id}, {"_id": 0}).sort("start_date", -1).to_list(500)
+    emps = {e["id"]: e for e in await db.employees.find({}, {"_id": 0}).to_list(5000)}
+    for r in rows:
+        r["nama"] = emps.get(r["employee_id"], {}).get("nama")
+    return rows
+
+
+@api.post("/commanders")
+async def set_commander(body: CommanderIn, user: dict = Depends(require_roles("admin", "operator"))):
+    emp = await db.employees.find_one({"id": body.employee_id})
+    team = await db.teams.find_one({"id": body.team_id})
+    if not emp or not team:
+        raise HTTPException(status_code=404, detail="Pegawai / Regu tidak ditemukan")
+    prev_day = (_date.fromisoformat(body.start_date) - timedelta(days=1)).isoformat()
+    existing = await db.team_commanders.find({"team_id": body.team_id}, {"_id": 0}).to_list(500)
+    for a in existing:
+        a_end = a.get("end_date") or "9999-12-31"
+        if a.get("end_date") is None and a["start_date"] < body.start_date:
+            continue
+        if a["start_date"] <= "9999-12-31" and a_end >= body.start_date:
+            raise HTTPException(status_code=400, detail="Periode komandan bertabrakan dengan data sebelumnya.")
+    for a in existing:
+        if a.get("end_date") is None and a["start_date"] < body.start_date:
+            await db.team_commanders.update_one({"id": a["id"]}, {"$set": {"end_date": prev_day, "updated_at": now_iso()}})
+    doc = {"id": str(uuid.uuid4()), "team_id": body.team_id, "employee_id": body.employee_id,
+           "start_date": body.start_date, "end_date": None, "created_at": now_iso(), "updated_at": now_iso()}
+    await db.team_commanders.insert_one(doc)
+    await write_audit(user, "Menetapkan Komandan Regu", employee_name=emp["nama"],
+                      detail=f"{team['name']} mulai {body.start_date}")
+    return clean(doc)
+
+
+@api.get("/kasubid")
+async def kasubid_info(date: str = None, user: dict = Depends(get_current_user)):
+    ref = date or _date.today().isoformat()
+    emps = {e["id"]: e for e in await db.employees.find({}, {"_id": 0}).to_list(5000)}
+    out = []
+    for pid, label in KASUBID_POSITIONS:
+        eid = await resolve_kasubid_for_date(pid, ref)
+        history = await db.sub_unit_assignments.find({"position_id": pid}, {"_id": 0}).sort("start_date", -1).to_list(500)
+        for h in history:
+            h["nama"] = emps.get(h["employee_id"], {}).get("nama")
+        out.append({"position_id": pid, "label": label, "employee_id": eid,
+                    "nama": emps.get(eid, {}).get("nama") if eid else None, "history": history})
+    return out
+
+
+@api.post("/kasubid")
+async def set_kasubid(body: KasubidIn, user: dict = Depends(require_roles("admin"))):
+    if body.position_id not in ("KASUBID1", "KASUBID2"):
+        raise HTTPException(status_code=400, detail="Posisi tidak valid")
+    emp = await db.employees.find_one({"id": body.employee_id})
+    if not emp:
+        raise HTTPException(status_code=404, detail="Pegawai tidak ditemukan")
+    other = "KASUBID2" if body.position_id == "KASUBID1" else "KASUBID1"
+    other_eid = await resolve_kasubid_for_date(other, body.start_date)
+    if other_eid == body.employee_id:
+        raise HTTPException(status_code=400, detail="Kasubid 1 dan Kasubid 2 tidak boleh orang yang sama pada periode yang sama.")
+    prev_day = (_date.fromisoformat(body.start_date) - timedelta(days=1)).isoformat()
+    async for a in db.sub_unit_assignments.find({"position_id": body.position_id, "end_date": None}):
+        if a["start_date"] < body.start_date:
+            await db.sub_unit_assignments.update_one({"id": a["id"]}, {"$set": {"end_date": prev_day, "updated_at": now_iso()}})
+    doc = {"id": str(uuid.uuid4()), "position_id": body.position_id, "employee_id": body.employee_id,
+           "start_date": body.start_date, "end_date": None, "created_at": now_iso(), "updated_at": now_iso()}
+    await db.sub_unit_assignments.insert_one(doc)
+    label = dict(KASUBID_POSITIONS)[body.position_id]
+    await write_audit(user, f"Menetapkan {label}", employee_name=emp["nama"], detail=f"mulai {body.start_date}")
+    return clean(doc)
+
+
+@api.get("/org-structure")
+async def org_structure(date: str = None, user: dict = Depends(get_current_user)):
+    ref = date or _date.today().isoformat()
+    teams = await db.teams.find({}, {"_id": 0}).sort("order", 1).to_list(100)
+    team_map = await resolve_teams_for_date(ref)
+    emps = {e["id"]: e for e in await db.employees.find({"status": "ACTIVE"}, {"_id": 0}).to_list(5000)}
+    counts = {}
+    for eid, tid in team_map.items():
+        if eid in emps:
+            counts[tid] = counts.get(tid, 0) + 1
+    kasubid = []
+    for pid, label in KASUBID_POSITIONS:
+        eid = await resolve_kasubid_for_date(pid, ref)
+        kasubid.append({"position_id": pid, "label": label, "employee_id": eid,
+                        "nama": emps.get(eid, {}).get("nama") if eid else None,
+                        "jabatan": emps.get(eid, {}).get("jabatan") if eid else None})
+    team_out = []
+    for t in teams:
+        cid = await resolve_commander_for_date(t["id"], ref)
+        team_out.append({**t, "members_count": counts.get(t["id"], 0),
+                         "commander_id": cid, "commander_name": emps.get(cid, {}).get("nama") if cid else None})
+    return {"date": ref, "kasubid": kasubid, "teams": team_out}
+
+
+@api.get("/teams/{team_id}/detail")
+async def team_detail(team_id: str, date: str = None, user: dict = Depends(get_current_user)):
+    ref = date or _date.today().isoformat()
+    team = await db.teams.find_one({"id": team_id}, {"_id": 0})
+    if not team:
+        raise HTTPException(status_code=404, detail="Regu tidak ditemukan")
+    team_map = await resolve_teams_for_date(ref)
+    ids = [eid for eid, tid in team_map.items() if tid == team_id]
+    members = await db.employees.find({"id": {"$in": ids}, "status": "ACTIVE"}, {"_id": 0}).sort("no", 1).to_list(5000)
+    cid = await resolve_commander_for_date(team_id, ref)
+    cemp = await db.employees.find_one({"id": cid}, {"_id": 0}) if cid else None
+    for m in members:
+        m["is_commander"] = (m["id"] == cid)
+    return {"team": team, "commander": {"employee_id": cid, "nama": cemp["nama"] if cemp else None},
+            "members": members, "date": ref}
+
+
+@api.get("/teams/{team_id}/history")
+async def team_history(team_id: str, user: dict = Depends(get_current_user)):
+    assigns = await db.team_assignments.find({"team_id": team_id}, {"_id": 0}).to_list(5000)
+    emps = {e["id"]: e for e in await db.employees.find({}, {"_id": 0}).to_list(5000)}
+    events = []
+    for a in assigns:
+        nm = emps.get(a["employee_id"], {}).get("nama", "-")
+        events.append({"date": a["start_date"], "nama": nm, "aksi": "Masuk", "keterangan": "Penempatan / rolling masuk"})
+        if a.get("end_date"):
+            nxt = (_date.fromisoformat(a["end_date"]) + timedelta(days=1)).isoformat()
+            events.append({"date": nxt, "nama": nm, "aksi": "Keluar", "keterangan": "Rolling keluar"})
+    events.sort(key=lambda x: x["date"], reverse=True)
+    return events
+
+
+# ---------------------------------------------------------------------------
+# Self-service (Absensi Saya)
+# ---------------------------------------------------------------------------
+async def _require_employee(user):
+    eid = user.get("employee_id")
+    if not eid:
+        raise HTTPException(status_code=400, detail="Akun Anda belum tertaut ke data pegawai. Hubungi Admin.")
+    return eid
+
+
+@api.get("/me/profile")
+async def my_profile(user: dict = Depends(get_current_user)):
+    eid = await _require_employee(user)
+    emp = await db.employees.find_one({"id": eid}, {"_id": 0})
+    if not emp:
+        raise HTTPException(status_code=404, detail="Data pegawai tidak ditemukan")
+    today = _date.today().isoformat()
+    tid = (await resolve_teams_for_date(today)).get(eid)
+    team = await db.teams.find_one({"id": tid}, {"_id": 0}) if tid else None
+    cid = await resolve_commander_for_date(tid, today) if tid else None
+    cemp = await db.employees.find_one({"id": cid}, {"_id": 0}) if cid else None
+    kasubid_pos = None
+    for pid, label in KASUBID_POSITIONS:
+        if await resolve_kasubid_for_date(pid, today) == eid:
+            kasubid_pos = label
+    return {"employee": emp, "team": team, "commander": cemp["nama"] if cemp else None,
+            "is_commander": cid == eid, "kasubid_position": kasubid_pos}
+
+
+@api.get("/me/recap")
+async def my_recap(start: str, end: str, user: dict = Depends(get_current_user)):
+    eid = await _require_employee(user)
+    ey, em = int(end[:4]), int(end[5:7])
+    sd, ed = f"{start}-01", f"{end}-{last_day_of_month(ey, em):02d}"
+    records = await db.attendance.find({"employee_id": eid, "date": {"$gte": sd, "$lte": ed}}, {"_id": 0}).sort("date", 1).to_list(5000)
+    teams = {t["id"]: t for t in await db.teams.find({}, {"_id": 0}).to_list(100)}
+    by_emp = await build_intervals()
+    counts = {s: 0 for s in STATUSES}
+    dates = {s: [] for s in STATUSES}
+    for r in records:
+        st = r["status"]
+        if st in STATUSES:
+            counts[st] += 1
+            tid = resolve_team_at(by_emp, eid, r["date"])
+            dates[st].append({"date": r["date"], "regu": teams.get(tid, {}).get("name", "-")})
+    return {"counts": counts, "dates": dates, "total": sum(counts.values()),
+            "period_label": _period_label(start, end)}
+
+
+@api.get("/me/calendar")
+async def my_calendar(month: str, user: dict = Depends(get_current_user)):
+    eid = await _require_employee(user)
+    y, m = int(month[:4]), int(month[5:7])
+    ld = last_day_of_month(y, m)
+    records = await db.attendance.find(
+        {"employee_id": eid, "date": {"$gte": f"{month}-01", "$lte": f"{month}-{ld:02d}"}}, {"_id": 0}
+    ).to_list(100)
+    teams = {t["id"]: t for t in await db.teams.find({}, {"_id": 0}).to_list(100)}
+    by_emp = await build_intervals()
+    days = {}
+    for r in records:
+        tid = resolve_team_at(by_emp, eid, r["date"])
+        days[r["date"]] = {"status": r["status"], "regu": teams.get(tid, {}).get("name", "-")}
+    return {"month": month, "days": days}
+
+
+@api.get("/me/assignments")
+async def my_assignments(user: dict = Depends(get_current_user)):
+    eid = await _require_employee(user)
+    assigns = await db.team_assignments.find({"employee_id": eid}, {"_id": 0}).sort("start_date", -1).to_list(500)
+    teams = {t["id"]: t for t in await db.teams.find({}, {"_id": 0}).to_list(100)}
+    for a in assigns:
+        a["team_name"] = teams.get(a["team_id"], {}).get("name")
+    return assigns
+
+
+# ---------------------------------------------------------------------------
+# Kasubid recap + export
+# ---------------------------------------------------------------------------
+async def _compute_kasubid_recap(start_month, end_month):
+    months = month_range(start_month, end_month)
+    sd = f"{start_month}-01"
+    ey, em = int(end_month[:4]), int(end_month[5:7])
+    ed = f"{end_month}-{last_day_of_month(ey, em):02d}"
+    records = await db.attendance.find({"date": {"$gte": sd, "$lte": ed}}, {"_id": 0}).to_list(500000)
+    att = {(r["employee_id"], r["date"]): r["status"] for r in records}
+    emps = {e["id"]: e for e in await db.employees.find({}, {"_id": 0}).to_list(5000)}
+    positions = []
+    detail = []
+    for pid, label in KASUBID_POSITIONS:
+        counts = {s: 0 for s in STATUSES}
+        monthly = {m: {s: 0 for s in STATUSES} for m in months}
+        holders = []
+        d = _date.fromisoformat(sd)
+        end_d = _date.fromisoformat(ed)
+        while d <= end_d:
+            ds = d.isoformat()
+            eid = await resolve_kasubid_for_date(pid, ds)
+            if eid:
+                nm = emps.get(eid, {}).get("nama")
+                if nm and nm not in holders:
+                    holders.append(nm)
+                st = att.get((eid, ds))
+                if st in STATUSES:
+                    counts[st] += 1
+                    monthly[ds[:7]][st] += 1
+                    detail.append({"date": ds, "position_id": pid, "label": label,
+                                   "nama": nm, "status": st})
+            d += timedelta(days=1)
+        positions.append({
+            "position_id": pid, "label": label, "holders": holders,
+            "nama": " / ".join(holders) if holders else "-",
+            **counts, "total": sum(counts.values()),
+            "monthly": [{"month": m, "month_label": _month_label(m), **monthly[m],
+                         "total": sum(monthly[m].values())} for m in months],
+        })
+    detail.sort(key=lambda x: (x["position_id"], x["date"]))
+    return {"months": months, "positions": positions, "detail": detail,
+            "period_label": _period_label(start_month, end_month)}
+
+
+@api.get("/recap/kasubid")
+async def recap_kasubid(start: str, end: str,
+                        user: dict = Depends(require_roles("admin", "operator", "viewer", "kasubid"))):
+    if start > end:
+        raise HTTPException(status_code=400, detail="Periode tidak valid")
+    return await _compute_kasubid_recap(start, end)
+
+
+@api.get("/export/kasubid/excel")
+async def export_kasubid_excel(start: str, end: str,
+                               user: dict = Depends(require_roles("admin", "operator", "viewer", "kasubid"))):
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, PatternFill, Border, Side, Alignment
+    data = await _compute_kasubid_recap(start, end)
+    wb = Workbook()
+    thin = Side(style="thin", color="94A3B8")
+    border = Border(left=thin, right=thin, top=thin, bottom=thin)
+    hf = PatternFill("solid", fgColor="0F172A")
+    hfont = Font(bold=True, color="FFFFFF")
+    center = Alignment(horizontal="center", vertical="center")
+
+    def head(ws, cols, row=1):
+        for i, c in enumerate(cols, 1):
+            cell = ws.cell(row=row, column=i, value=c)
+            cell.fill = hf; cell.font = hfont; cell.alignment = center; cell.border = border
+
+    ws = wb.active; ws.title = "Ringkasan Kasubid"
+    head(ws, ["No", "Nama", "Posisi"] + STATUSES + ["Total"])
+    r = 2
+    for i, p in enumerate(data["positions"], 1):
+        vals = [i, p["nama"], p["label"]] + [p[s] for s in STATUSES] + [p["total"]]
+        for j, v in enumerate(vals, 1):
+            c = ws.cell(row=r, column=j, value=v); c.border = border
+        r += 1
+    for col in "ABCDEFGHIJK":
+        ws.column_dimensions[col].width = 16
+
+    ws2 = wb.create_sheet("Detail Bulanan")
+    head(ws2, ["Nama", "Posisi", "Bulan"] + STATUSES + ["Total"])
+    r = 2
+    for p in data["positions"]:
+        for mo in p["monthly"]:
+            vals = [p["nama"], p["label"], mo["month_label"]] + [mo[s] for s in STATUSES] + [mo["total"]]
+            for j, v in enumerate(vals, 1):
+                c = ws2.cell(row=r, column=j, value=v); c.border = border
+            r += 1
+    for col in "ABCDEFGHIJ":
+        ws2.column_dimensions[col].width = 16
+
+    ws3 = wb.create_sheet("Detail Harian")
+    head(ws3, ["Tanggal", "Nama", "Posisi", "Status", "Keterangan"])
+    r = 2
+    for d in data["detail"]:
+        vals = [d["date"], d["nama"], d["label"], d["status"], STATUS_LABEL.get(d["status"])]
+        for j, v in enumerate(vals, 1):
+            c = ws3.cell(row=r, column=j, value=v); c.border = border
+        r += 1
+    for col in "ABCDE":
+        ws3.column_dimensions[col].width = 20
+
+    buf = io.BytesIO(); wb.save(buf); buf.seek(0)
+    return StreamingResponse(buf, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                             headers={"Content-Disposition": f"attachment; filename=Rekap_Kasubid_{start}_{end}.xlsx"})
+
+
+@api.get("/export/kasubid/pdf")
+async def export_kasubid_pdf(start: str, end: str,
+                             user: dict = Depends(require_roles("admin", "operator", "viewer", "kasubid"))):
+    from reportlab.lib.pagesizes import A4, landscape
+    from reportlab.lib.units import mm
+    from reportlab.lib import colors
+    from reportlab.platypus import BaseDocTemplate, PageTemplate, Frame, Table, TableStyle, Paragraph, Spacer
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib.enums import TA_CENTER
+    data = await _compute_kasubid_recap(start, end)
+    buf = io.BytesIO()
+    page = landscape(A4)
+    doc = BaseDocTemplate(buf, pagesize=page, leftMargin=14 * mm, rightMargin=14 * mm, topMargin=30 * mm, bottomMargin=16 * mm)
+    frame = Frame(doc.leftMargin, doc.bottomMargin, doc.width, doc.height, id="m")
+    gen = datetime.now().strftime("%d-%m-%Y %H:%M")
+
+    def hf(canvas, d):
+        canvas.saveState(); w, h = page
+        canvas.setFont("Helvetica-Bold", 12); canvas.drawCentredString(w / 2, h - 13 * mm, KOP["l1"])
+        canvas.setFont("Helvetica-Bold", 10); canvas.drawCentredString(w / 2, h - 18 * mm, KOP["l2"])
+        canvas.setFont("Helvetica", 8.5); canvas.drawCentredString(w / 2, h - 22 * mm, KOP["l3"])
+        canvas.line(14 * mm, h - 25 * mm, w - 14 * mm, h - 25 * mm)
+        canvas.setFont("Helvetica-Oblique", 7.5)
+        canvas.drawString(14 * mm, 9 * mm, "Dicetak dari Sistem Informasi Absensi DAMKAR")
+        canvas.drawRightString(w - 14 * mm, 9 * mm, f"Halaman {d.page}  |  {gen}")
+        canvas.restoreState()
+
+    doc.addPageTemplates([PageTemplate(id="m", frames=[frame], onPage=hf)])
+    styles = getSampleStyleSheet()
+    title = ParagraphStyle("t", parent=styles["Title"], fontSize=13, alignment=TA_CENTER)
+    sub = ParagraphStyle("s", parent=styles["Normal"], fontSize=10, alignment=TA_CENTER)
+    el = [Paragraph("REKAP ABSENSI KASUBID", title),
+          Paragraph(f"Periode: {data['period_label']}", sub), Spacer(1, 8)]
+    header = ["No", "Nama", "Posisi"] + STATUSES + ["Total"]
+    td = [header]
+    for i, p in enumerate(data["positions"], 1):
+        td.append([i, Paragraph(p["nama"], styles["BodyText"]), p["label"]] + [p[s] for s in STATUSES] + [p["total"]])
+    t = Table(td, repeatRows=1, colWidths=[12 * mm, 80 * mm, 30 * mm] + [16 * mm] * 6 + [18 * mm])
+    t.setStyle(TableStyle([
+        ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#94A3B8")),
+        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#0F172A")),
+        ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+        ("FONTSIZE", (0, 0), (-1, -1), 9),
+        ("ALIGN", (3, 0), (-1, -1), "CENTER"),
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+    ]))
+    el.append(t)
+    doc.build(el); buf.seek(0)
+    return StreamingResponse(buf, media_type="application/pdf",
+                             headers={"Content-Disposition": f"attachment; filename=Rekap_Kasubid_{start}_{end}.pdf"})
+
+
+# ---------------------------------------------------------------------------
 # Startup: seed
 # ---------------------------------------------------------------------------
 async def seed():
@@ -1016,6 +1500,8 @@ async def seed():
     await db.team_assignments.create_index("employee_id")
     await db.attendance.create_index([("employee_id", 1), ("date", 1)], unique=True)
     await db.attendance.create_index("date")
+    await db.team_commanders.create_index("team_id")
+    await db.sub_unit_assignments.create_index("position_id")
 
     # admin
     admin_email = os.environ["ADMIN_EMAIL"].lower()
@@ -1102,6 +1588,42 @@ async def seed():
                 await db.attendance.insert_many(docs[i:i + 2000], ordered=False)
             except Exception:
                 pass
+
+    # seed commanders (first member of each regu) + kasubid positions
+    if await db.team_commanders.count_documents({}) == 0 and emp_ids:
+        team_map_now = await resolve_teams_for_date("2026-01-01")
+        for order, tid in team_ids.items():
+            member = next((eid for eid in emp_ids if team_map_now.get(eid) == tid), None)
+            if member:
+                await db.team_commanders.insert_one({
+                    "id": str(uuid.uuid4()), "team_id": tid, "employee_id": member,
+                    "start_date": "2026-01-01", "end_date": None,
+                    "created_at": now_iso(), "updated_at": now_iso(),
+                })
+    if await db.sub_unit_assignments.count_documents({}) == 0 and len(emp_ids) >= 2:
+        for pid, eidx in [("KASUBID1", 0), ("KASUBID2", 1)]:
+            await db.sub_unit_assignments.insert_one({
+                "id": str(uuid.uuid4()), "position_id": pid, "employee_id": emp_ids[eidx],
+                "start_date": "2026-01-01", "end_date": None,
+                "created_at": now_iso(), "updated_at": now_iso(),
+            })
+
+    # link/seed demo staff + kasubid accounts to employees
+    if emp_ids:
+        links = [
+            ("staff@damkar.go.id", "Pegawai (Staff)", "staff", emp_ids[2]),
+            ("kasubid@damkar.go.id", "Kasubid 1", "kasubid", emp_ids[0]),
+        ]
+        for em, nm, role, link_eid in links:
+            ex = await db.users.find_one({"email": em})
+            if not ex:
+                await db.users.insert_one({
+                    "id": str(uuid.uuid4()), "name": nm, "email": em,
+                    "password_hash": hash_password("Damkar2026!"), "role": role,
+                    "status": "ACTIVE", "employee_id": link_eid, "created_at": now_iso(),
+                })
+            elif not ex.get("employee_id"):
+                await db.users.update_one({"email": em}, {"$set": {"employee_id": link_eid}})
 
     logger.info("Seeding complete")
 

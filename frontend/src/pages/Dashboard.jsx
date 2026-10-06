@@ -3,7 +3,7 @@ import api from "@/lib/api";
 import { STATUSES, STATUS_CONFIG } from "@/lib/constants";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
-import { Users, Flame } from "lucide-react";
+import { Users, Flame, Star } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, CartesianGrid } from "recharts";
 
 const today = new Date().toISOString().slice(0, 10);
@@ -67,6 +67,23 @@ export default function Dashboard() {
         })}
       </div>
 
+      {/* Org structure: Kasubid */}
+      {data?.kasubid && (
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          {data.kasubid.map((k) => (
+            <Card key={k.position_id} data-testid={`kasubid-${k.position_id}`} className="flex items-center gap-4 border-slate-200 p-4">
+              <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-amber-100 text-amber-600">
+                <Star className="h-6 w-6" />
+              </div>
+              <div>
+                <p className="text-xs font-bold uppercase text-slate-400">{k.label}</p>
+                <p className="font-heading text-lg font-bold text-slate-900">{k.nama || "— belum ditetapkan"}</p>
+              </div>
+            </Card>
+          ))}
+        </div>
+      )}
+
       {/* Chart */}
       <Card className="border-slate-200 p-5">
         <h3 className="font-heading text-base font-bold text-slate-800 mb-4">Grafik Kehadiran per Regu</h3>
@@ -102,7 +119,7 @@ export default function Dashboard() {
                   </div>
                   <div>
                     <p className="font-heading font-bold text-slate-900">{t.team.name}</p>
-                    <p className="text-xs text-slate-400">{t.members} anggota</p>
+                    <p className="text-xs text-slate-400">{t.members} anggota · ⭐ {t.commander_name || "—"}</p>
                   </div>
                 </div>
               </div>
