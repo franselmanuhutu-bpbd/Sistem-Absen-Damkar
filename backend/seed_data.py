@@ -1,4 +1,22 @@
-"""Initial employee master data imported from 'Project Absen.xlsx' (DAMKAR Mimika)."""
+"""Master employee and team reference data imported from 'Project Absen.xlsx' (DAMKAR Mimika).
+Provides seeding logic for structure and master data only (teams, employees, assignments).
+User accounts and attendance records are not pre-generated and should be created explicitly.
+"""
+
+import os
+import uuid
+import logging
+from pathlib import Path
+from datetime import datetime, timezone
+from dotenv import load_dotenv
+from supabase import create_client, Client
+
+ROOT_DIR = Path(__file__).parent
+load_dotenv(ROOT_DIR / ".env")
+load_dotenv(ROOT_DIR.parent / ".env")
+
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
+logger = logging.getLogger("seed")
 
 SEED_EMPLOYEES = [
     {"no": 1, "nama": "Yosep Bleskadit", "nip": "198101152006051004", "pangkat": "III/a", "jabatan": "Kepala Sub Bidang Pencegahan Kebakaran"},
@@ -65,3 +83,112 @@ SEED_TEAMS = [
     {"name": "Regu 5", "code": "R-05", "order": 5},
     {"name": "Regu 6", "code": "R-06", "order": 6},
 ]
+
+
+def now_iso() -> str:
+    return datetime.now(timezone.utc).isoformat()
+
+
+def get_client() -> Client:
+    url = os.environ.get("SUPABASE_URL")
+    key = os.environ.get("SUPABASE_SECRET_KEY")
+    if not url or not key:
+        raise ValueError("SUPABASE_URL and SUPABASE_SECRET_KEY must be set in .env")
+    return create_client(url, key)
+
+
+def seed_master_data(client: Client = None):
+    """Seed master structural data (teams and employees) into Supabase PostgreSQL."""
+    if client is None:
+        client = get_client()
+
+    logger.info("Verifying tables in Supabase PostgreSQL...")
+    try:
+        client.table("teams").select("id").limit(1).execute()
+    except Exception as e:
+        logger.error("Could not query 'teams' table. Ensure schema is deployed!")
+        raise RuntimeError("Tables do not exist in database.") from e
+
+    # 1. Seed Teams
+    team_ids = {}
+    existing_teams = client.table("teams").select("*").execute().data
+    existing_by_code = {t["code"]: t["id"] for t in existing_teams}
+    for t in SEED_TEAMS:
+        if t["code"] in existing_by_code:
+            team_ids[t["order"]] = existing_by_code[t["code"]]
+        else:
+            tid = str(uuid.uuid4())
+            logger.info(f"Creating team: {t['name']} ({t['code']})")
+            client.table("teams").insert({"id": tid, **t}).execute()
+            team_ids[t["order"]] = tid
+
+    # 2. Seed Employees
+    existing_employees = client.table("employees").select("id,no").order("no").execute().data
+    emp_ids = []
+    if not existing_employees:
+        logger.info(f"Seeding {len(SEED_EMPLOYEES)} master employees...")
+        emp_records = []
+        for e in SEED_EMPLOYEES:
+            eid = str(uuid.uuid4())
+            emp_ids.append(eid)
+            emp_records.append({
+                "id": eid,
+                "no": e["no"],
+                "nama": e["nama"],
+                "nip": e["nip"],
+                "pangkat": e["pangkat"],
+                "jabatan": e["jabatan"],
+                "status": "ACTIVE",
+                "created_at": now_iso(),
+            })
+        client.table("employees").insert(emp_records).execute()
+    else:
+        emp_ids = [e["id"] for e in existing_employees]
+
+    # 3. Team Assignments (distribute employees across 6 teams)
+    existing_assigns = client.table("team_assignments").select("id").limit(1).execute().data
+    if not existing_assigns and emp_ids:
+        logger.info("Setting initial team assignments across teams...")
+        order_list = sorted(team_ids.keys())
+        assign_records = []
+        for i, eid in enumerate(emp_ids):
+            tid = team_ids[order_list[i % len(order_list)]]
+            assign_records.append({
+                "id": str(uuid.uuid4()),
+                "employee_id": eid,
+                "team_id": tid,
+                "start_date": "2026-01-01",
+                "end_date": None,
+                "created_at": now_iso(),
+            })
+        client.table("team_assignments").insert(assign_records).execute()
+
+    # 4. Team Commanders
+    existing_cmd = client.table("team_commanders").select("id").limit(1).execute().data
+    if not existing_cmd and emp_ids:
+        logger.info("Setting initial team commanders...")
+        cmd_records = []
+        order_list = sorted(team_ids.keys())
+        for i, order in enumerate(order_list):
+            tid = team_ids[order]
+            member_eid = emp_ids[i]
+            cmd_records.append({
+                "id": str(uuid.uuid4()),
+                "team_id": tid,
+                "employee_id": member_eid,
+                "start_date": "2026-01-01",
+                "end_date": None,
+                "created_at": now_iso(),
+                "updated_at": now_iso(),
+            })
+        client.table("team_commanders").insert(cmd_records).execute()
+
+    logger.info("Master data verification completed successfully!")
+
+
+if __name__ == "__main__":
+    try:
+        seed_master_data()
+        print("\n--> Master data seeded successfully.")
+    except Exception as exc:
+        print(f"\n--> FAILED: {exc}")

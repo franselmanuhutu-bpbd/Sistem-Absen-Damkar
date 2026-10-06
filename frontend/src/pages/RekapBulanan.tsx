@@ -61,7 +61,7 @@ export default function RekapBulanan() {
           <h2 className="font-heading text-2xl font-bold text-slate-900">Rekap Bulanan</h2>
           <p className="text-sm text-slate-500">Rekap kehadiran {monthLabel(month)}</p>
         </div>
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap gap-1">
           <Input type="month" data-testid="rekap-month" value={month} onChange={(e) => setMonth(e.target.value)} className="h-10 w-40 bg-white" />
           <Select value={teamId} onValueChange={setTeamId}>
             <SelectTrigger className="h-10 w-40 bg-white" data-testid="rekap-team"><SelectValue /></SelectTrigger>
