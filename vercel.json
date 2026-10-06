@@ -3,8 +3,8 @@
   "version": 2,
   "git": {
     "deploymentEnabled": {
-      "main": false,
-      "master": false
+      "main": true,
+      "master": true
     }
   },
   "services": {

@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Star, Loader2, Info } from "lucide-react";
 import { toast } from "sonner";
+import { TableSkeleton } from "@/components/ui/table-skeleton";
 
 const today = new Date().toISOString().slice(0, 10);
 
@@ -59,7 +60,9 @@ export default function AbsensiKasubid() {
       </Card>
 
       {loading ? (
-        <div className="flex justify-center py-16"><Loader2 className="h-6 w-6 animate-spin text-slate-400" /></div>
+        <Card className="overflow-hidden border-slate-200">
+          <TableSkeleton rows={4} columns={5} />
+        </Card>
       ) : roster.length === 0 ? (
         <Card className="flex items-center gap-3 border-amber-200 bg-amber-50 p-6 text-amber-800" data-testid="ks-empty">
           <Info className="h-5 w-5 shrink-0" />
@@ -104,7 +107,7 @@ export default function AbsensiKasubid() {
       )}
 
       {roster.length > 0 && (
-        <div className="fixed bottom-0 left-0 right-0 z-20 border-t border-slate-200 bg-white/95 p-3 shadow-[0_-4px_20px_rgba(0,0,0,0.06)] backdrop-blur lg:left-64">
+        <div className="bottom-0 left-0 right-0 z-20 border-t rounded-xl border-slate-200 bg-white/95 p-3 shadow-[0_-4px_20px_rgba(0,0,0,0.06)] backdrop-blur lg:left-12 lg:right-12">
           <div className="mx-auto grid max-w-5xl grid-cols-3 gap-2 sm:grid-cols-6">
             {STATUSES.map((s) => (
               <Button key={s} disabled={saving} onClick={() => applyStatus(s)} data-testid={`ks-batch-${s}-btn`} className={`min-h-[48px] font-bold text-white ${STATUS_CONFIG[s].btn}`}>

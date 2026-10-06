@@ -10,7 +10,7 @@ Aplikasi frontend Sistem Informasi Absensi DAMKAR Mimika dibangun dengan **React
 Jalankan perintah berikut di dalam direktori `frontend`:
 
 ### `bun dev` (atau `bun run dev`)
-Menjalankan server frontend di port 3000 dengan Hot Module Replacement (HMR) dan proxy otomatis untuk endpoint API (`/api/*`) ke backend FastAPI (port 8001 secara default).
+Menjalankan server frontend di port 3000 dengan Hot Module Replacement (HMR) dan proxy otomatis untuk endpoint API (`/api/*`) ke backend FastAPI (port 8000 secara default).
 
 Buka [http://localhost:3000](http://localhost:3000) di browser.
 

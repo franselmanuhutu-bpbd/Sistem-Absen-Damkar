@@ -5,7 +5,7 @@ from dotenv import load_dotenv
 load_dotenv('backend/.env')
 load_dotenv('.env')
 
-API = 'http://127.0.0.1:8001/api'
+API = 'http://127.0.0.1:8000/api'
 ADMIN_EMAIL = os.environ.get('ADMIN_EMAIL')
 ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD')
 

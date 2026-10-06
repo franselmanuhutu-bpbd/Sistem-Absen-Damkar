@@ -2,12 +2,13 @@ import { useEffect, useState, useCallback } from "react";
 import api, { apiError } from "@/lib/api";
 import { STATUSES, STATUS_CONFIG, monthLabel } from "@/lib/constants";
 import { StatusBadge } from "@/components/StatusBadge";
-import { Input } from "@/components/ui/input";
+import { MonthPicker } from "@/components/MonthPicker";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { UserCircle, Flame, Star, Loader2, Calendar as CalIcon } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
 
 function addMonths(ym, n) {
   let [y, m] = ym.split("-").map(Number);
@@ -41,7 +42,27 @@ export default function AbsensiSaya() {
   useEffect(() => { api.get("/me/calendar", { params: { month } }).then((r) => setCal(r.data)).catch(() => {}); }, [month]);
 
   if (err) return <Card className="border-amber-200 bg-amber-50 p-8 text-center text-amber-700">{err}</Card>;
-  if (!profile) return <div className="flex justify-center py-16"><Loader2 className="h-6 w-6 animate-spin text-slate-400" /></div>;
+  if (!profile) return (
+    <div className="space-y-5">
+      <Card className="border-slate-200 bg-[#0F172A] p-6 text-white">
+        <div className="flex items-center gap-4">
+          <Skeleton className="h-16 w-16 rounded-2xl bg-slate-800" />
+          <div className="space-y-2 flex-1">
+            <Skeleton className="h-6 w-48 bg-slate-800" />
+            <Skeleton className="h-4 w-64 bg-slate-800" />
+          </div>
+        </div>
+      </Card>
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+        {[1, 2, 3, 4, 5, 6].map((i) => (
+          <Card key={i} className="border-slate-200 p-4">
+            <Skeleton className="h-4 w-12 mb-2" />
+            <Skeleton className="h-8 w-16" />
+          </Card>
+        ))}
+      </div>
+    </div>
+  );
 
   const e = profile.employee;
   const [y, m] = month.split("-").map(Number);
@@ -82,10 +103,22 @@ export default function AbsensiSaya() {
 
         <TabsContent value="rekap" className="space-y-4">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="text-sm font-medium text-slate-600">Periode</span>
-            <Input type="month" value={start} onChange={(e) => { setStart(e.target.value); if (e.target.value > end) setEnd(e.target.value); }} className="h-10 w-40 bg-white" data-testid="my-start" />
-            <span className="text-slate-400">s/d</span>
-            <Input type="month" value={end} onChange={(e) => setEnd(e.target.value)} className="h-10 w-40 bg-white" data-testid="my-end" />
+            <span className="text-sm font-medium text-slate-600">Periode:</span>
+            <MonthPicker
+              data-testid="my-start"
+              value={start}
+              onChange={(val) => {
+                setStart(val);
+                if (val > end) setEnd(val);
+              }}
+            />
+            <span className="text-slate-400 text-xs font-semibold">s/d</span>
+            <MonthPicker
+              data-testid="my-end"
+              value={end}
+              min={start}
+              onChange={(val) => setEnd(val)}
+            />
           </div>
           <p className="text-sm text-slate-500">Transparansi absensi — klik kartu status untuk melihat tanggalnya.</p>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
@@ -106,8 +139,11 @@ export default function AbsensiSaya() {
 
         <TabsContent value="kalender">
           <div className="mb-3 flex items-center gap-2">
-            <CalIcon className="h-4 w-4 text-slate-500" />
-            <Input type="month" value={month} onChange={(e) => setMonth(e.target.value)} className="h-10 w-40 bg-white" data-testid="my-cal-month" />
+            <MonthPicker
+              data-testid="my-cal-month"
+              value={month}
+              onChange={(val) => setMonth(val)}
+            />
           </div>
           <Card className="border-slate-200 p-4">
             <div className="mb-3 grid grid-cols-7 gap-2 text-center text-xs font-bold uppercase text-slate-400">

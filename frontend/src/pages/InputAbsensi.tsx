@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Loader2, CheckCheck, Square } from "lucide-react";
 import { toast } from "sonner";
+import { TableSkeleton } from "@/components/ui/table-skeleton";
 
 const today = new Date().toISOString().slice(0, 10);
 
@@ -117,9 +118,7 @@ export default function InputAbsensi() {
 
       <Card className="overflow-hidden border-slate-200">
         {loading ? (
-          <div className="flex items-center justify-center py-16 text-slate-400">
-            <Loader2 className="h-6 w-6 animate-spin" />
-          </div>
+          <TableSkeleton rows={8} columns={5} />
         ) : roster.length === 0 ? (
           <div className="py-16 text-center text-slate-400">
             <p className="font-medium">Tidak ada anggota aktif di {teamName} pada tanggal ini.</p>
@@ -178,7 +177,7 @@ export default function InputAbsensi() {
       </Card>
 
       {/* Sticky action bar */}
-      <div className="fixed bottom-0 left-0 right-0 z-20 border-t border-slate-200 bg-white/95 p-3 shadow-[0_-4px_20px_rgba(0,0,0,0.06)] backdrop-blur lg:left-64">
+      <div className="bottom-0 left-0 right-0 z-20 border-t border-slate-200 rounded-xl bg-white/95 p-3 shadow-[0_-4px_20px_rgba(0,0,0,0.06)] backdrop-blur lg:left-12 lg:right-12">
         <div className="mx-auto grid max-w-5xl grid-cols-3 gap-2 sm:grid-cols-6">
           {STATUSES.map((s) => (
             <Button

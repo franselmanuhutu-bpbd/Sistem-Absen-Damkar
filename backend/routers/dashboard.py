@@ -25,6 +25,7 @@ async def dashboard(date: str = None, user: dict = Depends(get_current_user)):
 
     records = (await db.table("attendance").select("*").eq("date", ref).limit(10000).execute()).data or []
     rec_map = {r["employee_id"]: r["status"] for r in records}
+    rec_team_map = {r["employee_id"]: r.get("team_id") for r in records if r.get("team_id")}
 
     def empty():
         return {s: 0 for s in STATUSES}
@@ -32,7 +33,7 @@ async def dashboard(date: str = None, user: dict = Depends(get_current_user)):
     totals = empty()
     per_team = {t["id"]: {"team": t, "members": 0, **empty()} for t in teams}
     for e in active_emps:
-        tid = team_map.get(e["id"])
+        tid = team_map.get(e["id"]) or rec_team_map.get(e["id"])
         if tid in per_team:
             per_team[tid]["members"] += 1
         st = rec_map.get(e["id"])

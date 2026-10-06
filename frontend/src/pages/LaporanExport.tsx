@@ -3,7 +3,7 @@ import api, { downloadFile, apiError } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { MonthPicker } from "@/components/MonthPicker";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -82,8 +82,28 @@ export default function LaporanExport() {
         <Card className="border-slate-200 p-5 lg:col-span-2 space-y-4">
           <h3 className="font-heading font-bold text-slate-800">Filter Laporan</h3>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-            <div className="space-y-1.5"><Label>Bulan Mulai</Label><Input type="month" value={start} onChange={(e) => { setStart(e.target.value); if (e.target.value > end) setEnd(e.target.value); }} data-testid="lap-start" className="h-11" /></div>
-            <div className="space-y-1.5"><Label>Bulan Selesai</Label><Input type="month" value={end} onChange={(e) => setEnd(e.target.value)} data-testid="lap-end" className="h-11" /></div>
+            <div className="space-y-1.5 flex flex-col">
+              <Label>Bulan Mulai</Label>
+              <MonthPicker
+                data-testid="lap-start"
+                value={start}
+                onChange={(val) => {
+                  setStart(val);
+                  if (val > end) setEnd(val);
+                }}
+                className="w-full"
+              />
+            </div>
+            <div className="space-y-1.5 flex flex-col">
+              <Label>Bulan Selesai</Label>
+              <MonthPicker
+                data-testid="lap-end"
+                value={end}
+                min={start}
+                onChange={(val) => setEnd(val)}
+                className="w-full"
+              />
+            </div>
             <div className="space-y-1.5">
               <Label>Regu</Label>
               <Select value={teamId} onValueChange={setTeamId}>

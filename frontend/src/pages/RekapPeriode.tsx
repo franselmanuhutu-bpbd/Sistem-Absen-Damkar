@@ -1,13 +1,14 @@
 import { useEffect, useState, useCallback } from "react";
 import api, { downloadFile, apiError } from "@/lib/api";
 import { STATUSES, STATUS_CONFIG, monthLabel, MONTH_NAMES } from "@/lib/constants";
-import { Input } from "@/components/ui/input";
+import { MonthPicker } from "@/components/MonthPicker";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { FileSpreadsheet, FileText, Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import { TableSkeleton } from "@/components/ui/table-skeleton";
 
 function addMonths(ym, n) {
   let [y, m] = ym.split("-").map(Number);
@@ -96,13 +97,25 @@ export default function RekapPeriode() {
           ))}
         </div>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-          <div className="space-y-1.5">
+          <div className="space-y-1.5 flex flex-col">
             <label className="text-sm font-medium text-slate-600">Bulan Mulai</label>
-            <Input type="month" data-testid="period-start" value={start} onChange={(e) => onStart(e.target.value)} className="h-11 bg-white" />
+            <MonthPicker
+              data-testid="period-start"
+              value={start}
+              onChange={(val) => onStart(val)}
+              className="w-full"
+            />
           </div>
-          <div className="space-y-1.5">
+          <div className="space-y-1.5 flex flex-col">
             <label className="text-sm font-medium text-slate-600">Bulan Selesai</label>
-            <Input type="month" data-testid="period-end" value={end} disabled={quick > 0} onChange={(e) => setEnd(e.target.value)} className="h-11 bg-white disabled:opacity-60" />
+            <MonthPicker
+              data-testid="period-end"
+              value={end}
+              disabled={quick > 0}
+              min={start}
+              onChange={(val) => setEnd(val)}
+              className="w-full"
+            />
           </div>
           <div className="space-y-1.5">
             <label className="text-sm font-medium text-slate-600">Regu</label>
@@ -160,7 +173,7 @@ export default function RekapPeriode() {
 
         <TabsContent value="total">
           <Card className="overflow-hidden border-slate-200">
-            {loading ? <div className="flex justify-center py-16"><Loader2 className="h-6 w-6 animate-spin text-slate-400" /></div> : (
+            {loading ? <TableSkeleton rows={8} columns={7} /> : (
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
@@ -201,35 +214,37 @@ export default function RekapPeriode() {
         <TabsContent value="breakdown">
           <p className="mb-2 text-xs text-slate-500">Setiap baris mengikuti regu pegawai pada bulan tersebut (histori rolling terjaga).</p>
           <Card className="overflow-hidden border-slate-200">
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b bg-slate-50 text-left text-xs uppercase text-slate-500">
-                    <th className="px-3 py-3">No</th>
-                    <th className="px-3 py-3">Nama</th>
-                    <th className="px-3 py-3">Regu</th>
-                    <th className="px-3 py-3">Bulan</th>
-                    {STATUSES.map((s) => <th key={s} className="px-2 py-3 text-center">{s}</th>)}
-                    <th className="px-3 py-3 text-center">Total</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {(data?.breakdown || []).map((b, i) => (
-                    <tr key={i} className="border-b border-slate-100 hover:bg-slate-50" data-testid={`breakdown-row-${i}`}>
-                      <td className="px-3 py-2.5 text-slate-400">{b.no}</td>
-                      <td className="px-3 py-2.5 font-semibold text-slate-800">{b.nama}</td>
-                      <td className="px-3 py-2.5"><span className="rounded bg-red-50 px-2 py-0.5 text-xs font-semibold text-red-700">{b.regu}</span></td>
-                      <td className="px-3 py-2.5 text-slate-500">{b.month_label}</td>
-                      {STATUSES.map((s) => <td key={s} className="px-2 py-2.5 text-center font-semibold"><span className={b[s] > 0 ? STATUS_CONFIG[s].text : "text-slate-300"}>{b[s]}</span></td>)}
-                      <td className="px-3 py-2.5 text-center font-extrabold">{b.total}</td>
+            {loading ? <TableSkeleton rows={8} columns={6} /> : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b bg-slate-50 text-left text-xs uppercase text-slate-500">
+                      <th className="px-3 py-3">No</th>
+                      <th className="px-3 py-3">Nama</th>
+                      <th className="px-3 py-3">Regu</th>
+                      <th className="px-3 py-3">Bulan</th>
+                      {STATUSES.map((s) => <th key={s} className="px-2 py-3 text-center">{s}</th>)}
+                      <th className="px-3 py-3 text-center">Total</th>
                     </tr>
-                  ))}
-                  {(data?.breakdown || []).length === 0 && (
-                    <tr><td colSpan={11} className="py-10 text-center text-slate-400">Tidak ada data pada periode ini.</td></tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
+                  </thead>
+                  <tbody>
+                    {(data?.breakdown || []).map((b, i) => (
+                      <tr key={i} className="border-b border-slate-100 hover:bg-slate-50" data-testid={`breakdown-row-${i}`}>
+                        <td className="px-3 py-2.5 text-slate-400">{b.no}</td>
+                        <td className="px-3 py-2.5 font-semibold text-slate-800">{b.nama}</td>
+                        <td className="px-3 py-2.5"><span className="rounded bg-red-50 px-2 py-0.5 text-xs font-semibold text-red-700">{b.regu}</span></td>
+                        <td className="px-3 py-2.5 text-slate-500">{b.month_label}</td>
+                        {STATUSES.map((s) => <td key={s} className="px-2 py-2.5 text-center font-semibold"><span className={b[s] > 0 ? STATUS_CONFIG[s].text : "text-slate-300"}>{b[s]}</span></td>)}
+                        <td className="px-3 py-2.5 text-center font-extrabold">{b.total}</td>
+                      </tr>
+                    ))}
+                    {(data?.breakdown || []).length === 0 && (
+                      <tr><td colSpan={11} className="py-10 text-center text-slate-400">Tidak ada data pada periode ini.</td></tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </Card>
         </TabsContent>
       </Tabs>

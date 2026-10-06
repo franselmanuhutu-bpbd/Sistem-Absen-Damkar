@@ -9,6 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Label } from "@/components/ui/label";
 import { Search, Plus, Pencil, Power, History, Upload, Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import { TableSkeleton } from "@/components/ui/table-skeleton";
 
 export default function DataPegawai() {
   const { user } = useAuth();
@@ -103,7 +104,7 @@ export default function DataPegawai() {
       </Card>
 
       <Card className="overflow-hidden border-slate-200">
-        {loading ? <div className="flex justify-center py-16"><Loader2 className="h-6 w-6 animate-spin text-slate-400" /></div> : (
+        {loading ? <TableSkeleton rows={8} columns={7} /> : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>

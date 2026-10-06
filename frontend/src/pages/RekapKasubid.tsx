@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from "react";
 import api, { downloadFile, apiError } from "@/lib/api";
 import { STATUSES, STATUS_CONFIG, monthLabel } from "@/lib/constants";
-import { Input } from "@/components/ui/input";
+import { MonthPicker } from "@/components/MonthPicker";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { StatusBadge } from "@/components/StatusBadge";
 import { Star, FileSpreadsheet, FileText, Loader2, Eye } from "lucide-react";
 import { toast } from "sonner";
+import { Skeleton } from "@/components/ui/skeleton";
 
 function addMonths(ym, n) {
   let [y, m] = ym.split("-").map(Number);
@@ -53,9 +54,22 @@ export default function RekapKasubid() {
           <h2 className="font-heading text-2xl font-bold text-slate-900">Rekap Absensi Kasubid</h2>
           <p className="text-sm text-slate-500">Rekap kehadiran pejabat Kasubid 1 &amp; Kasubid 2 (historis per tanggal).</p>
         </div>
-        <div className="flex flex-wrap gap-2">
-          <Input type="month" data-testid="kasubid-start" value={start} onChange={(e) => { setStart(e.target.value); if (e.target.value > end) setEnd(e.target.value); }} className="h-10 w-40 bg-white" />
-          <Input type="month" data-testid="kasubid-end" value={end} onChange={(e) => setEnd(e.target.value)} className="h-10 w-40 bg-white" />
+        <div className="flex flex-wrap items-center gap-2">
+          <MonthPicker
+            data-testid="kasubid-start"
+            value={start}
+            onChange={(val) => {
+              setStart(val);
+              if (val > end) setEnd(val);
+            }}
+          />
+          <span className="text-xs font-semibold text-slate-400">s/d</span>
+          <MonthPicker
+            data-testid="kasubid-end"
+            value={end}
+            min={start}
+            onChange={(val) => setEnd(val)}
+          />
           <Button onClick={() => doExport("excel")} disabled={!!exp} data-testid="kasubid-excel" className="gap-2 bg-emerald-600 hover:bg-emerald-700">
             {exp === "excel" ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileSpreadsheet className="h-4 w-4" />} Excel
           </Button>
@@ -65,7 +79,27 @@ export default function RekapKasubid() {
         </div>
       </div>
 
-      {loading ? <div className="flex justify-center py-16"><Loader2 className="h-6 w-6 animate-spin text-slate-400" /></div> : (
+      {loading ? (
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+          {[1, 2].map((i) => (
+            <Card key={i} className="border-slate-200 p-5">
+              <div className="flex items-center gap-3">
+                <Skeleton className="h-11 w-11 rounded-xl bg-amber-50" />
+                <div className="space-y-2 flex-1">
+                  <Skeleton className="h-3 w-20" />
+                  <Skeleton className="h-5 w-44" />
+                  <Skeleton className="h-3 w-32" />
+                </div>
+              </div>
+              <div className="mt-4 grid grid-cols-3 gap-2 sm:grid-cols-6">
+                {[1, 2, 3, 4, 5, 6].map((j) => (
+                  <Skeleton key={j} className="h-14 rounded-lg" />
+                ))}
+              </div>
+            </Card>
+          ))}
+        </div>
+      ) : (
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
           {(data?.positions || []).map((p) => (
             <Card key={p.position_id} className="border-slate-200 p-5" data-testid={`kasubid-card-${p.position_id}`}>

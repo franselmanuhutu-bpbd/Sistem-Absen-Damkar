@@ -1,11 +1,11 @@
 import { useEffect, useState } from "react";
 import api from "@/lib/api";
-import { STATUSES, STATUS_CONFIG, monthLabel } from "@/lib/constants";
+import { STATUSES, STATUS_CONFIG } from "@/lib/constants";
 import { StatusBadge } from "@/components/StatusBadge";
-import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { MonthPicker } from "@/components/MonthPicker";
 
 const curMonth = new Date().toISOString().slice(0, 7);
 const DOW = ["Min", "Sen", "Sel", "Rab", "Kam", "Jum", "Sab"];
@@ -13,10 +13,11 @@ const DOW = ["Min", "Sen", "Sel", "Rab", "Kam", "Jum", "Sab"];
 export default function Kalender() {
   const [month, setMonth] = useState(curMonth);
   const [teamId, setTeamId] = useState("all");
-  const [teams, setTeams] = useState([]);
-  const [data, setData] = useState(null);
+  const [teams, setTeams] = useState<any[]>([]);
+  const [data, setData] = useState<any>(null);
+  const [loading, setLoading] = useState(false);
   const [open, setOpen] = useState(false);
-  const [detail, setDetail] = useState([]);
+  const [detail, setDetail] = useState<any[]>([]);
   const [activeDay, setActiveDay] = useState("");
 
   useEffect(() => {
@@ -24,9 +25,13 @@ export default function Kalender() {
   }, []);
 
   useEffect(() => {
+    setLoading(true);
     const params: Record<string, string> = { month };
     if (teamId !== "all") params.team_id = teamId;
-    api.get("/calendar", { params }).then((r) => setData(r.data));
+    api
+      .get("/calendar", { params })
+      .then((r) => setData(r.data))
+      .finally(() => setLoading(false));
   }, [month, teamId]);
 
   const openDay = (dstr: any) => {
@@ -53,13 +58,19 @@ export default function Kalender() {
           <h2 className="font-heading text-2xl font-bold text-slate-900">Kalender Absensi</h2>
           <p className="text-sm text-slate-500">Ringkasan harian — klik tanggal untuk detail.</p>
         </div>
-        <div className="flex gap-2">
-          <Input type="month" data-testid="calendar-month" value={month} onChange={(e) => setMonth(e.target.value)} className="h-10 w-40 bg-white" />
+        <div className="flex flex-wrap items-center gap-2">
+          <MonthPicker value={month} onChange={setMonth} data-testid="calendar-month" />
           <Select value={teamId} onValueChange={setTeamId}>
-            <SelectTrigger className="h-10 w-40 bg-white" data-testid="calendar-team"><SelectValue /></SelectTrigger>
+            <SelectTrigger className="h-10 w-40 bg-white" data-testid="calendar-team">
+              <SelectValue />
+            </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Semua Regu</SelectItem>
-              {teams.map((t) => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}
+              {teams.map((t) => (
+                <SelectItem key={t.id} value={t.id}>
+                  {t.name}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
         </div>
@@ -67,34 +78,50 @@ export default function Kalender() {
 
       <Card className="border-slate-200 p-4">
         <div className="mb-3 grid grid-cols-7 gap-2 text-center text-xs font-bold uppercase text-slate-400">
-          {DOW.map((d) => <div key={d}>{d}</div>)}
+          {DOW.map((d) => (
+            <div key={d}>{d}</div>
+          ))}
         </div>
         <div className="grid grid-cols-7 gap-2">
-          {cells.map((d, i) => {
-            if (!d) return <div key={i} />;
-            const dstr = `${month}-${String(d).padStart(2, "0")}`;
-            const counts = data?.days?.[dstr] || {};
-            const total = STATUSES.reduce((a, s) => a + (counts[s] || 0), 0);
-            return (
-              <button
+          {loading ? (
+            Array.from({ length: 35 }).map((_, i) => (
+              <div
                 key={i}
-                data-testid={`cal-day-${dstr}`}
-                onClick={() => openDay(dstr)}
-                className="group flex min-h-[70px] flex-col rounded-lg border border-slate-200 bg-white p-1.5 text-left transition-all hover:border-red-300 hover:shadow-sm sm:min-h-[92px]"
+                className="min-h-[70px] rounded-lg border border-slate-100 bg-slate-50/60 p-2 sm:min-h-[92px] animate-pulse"
               >
-                <span className="text-xs font-bold text-slate-600 group-hover:text-red-600">{d}</span>
-                {total > 0 && (
-                  <div className="mt-1 flex flex-wrap gap-0.5">
-                    {STATUSES.filter((s) => counts[s] > 0).map((s) => (
-                      <span key={s} className={`rounded px-1 text-[9px] font-bold leading-tight ${STATUS_CONFIG[s].badge}`}>
-                        {counts[s]}
-                      </span>
-                    ))}
-                  </div>
-                )}
-              </button>
-            );
-          })}
+                <div className="h-3 w-4 rounded bg-slate-200" />
+              </div>
+            ))
+          ) : (
+            cells.map((d, i) => {
+              if (!d) return <div key={i} />;
+              const dstr = `${month}-${String(d).padStart(2, "0")}`;
+              const counts = data?.days?.[dstr] || {};
+              const total = STATUSES.reduce((a, s) => a + (counts[s] || 0), 0);
+              return (
+                <button
+                  key={i}
+                  data-testid={`cal-day-${dstr}`}
+                  onClick={() => openDay(dstr)}
+                  className="group flex min-h-[70px] flex-col rounded-lg border border-slate-200 bg-white p-1.5 text-left transition-all hover:border-red-300 hover:shadow-sm sm:min-h-[92px]"
+                >
+                  <span className="text-xs font-bold text-slate-600 group-hover:text-red-600">{d}</span>
+                  {total > 0 && (
+                    <div className="mt-1 flex flex-wrap gap-0.5">
+                      {STATUSES.filter((s) => counts[s] > 0).map((s) => (
+                        <span
+                          key={s}
+                          className={`rounded px-1 text-[9px] font-bold leading-tight ${STATUS_CONFIG[s].badge}`}
+                        >
+                          {counts[s]}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </button>
+              );
+            })
+          )}
         </div>
       </Card>
 
@@ -109,7 +136,9 @@ export default function Kalender() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b text-left text-xs text-slate-500">
-                  <th className="py-2">Nama</th><th className="py-2">Regu</th><th className="py-2 text-right">Status</th>
+                  <th className="py-2">Nama</th>
+                  <th className="py-2">Regu</th>
+                  <th className="py-2 text-right">Status</th>
                 </tr>
               </thead>
               <tbody>
@@ -117,7 +146,9 @@ export default function Kalender() {
                   <tr key={i} className="border-b border-slate-100">
                     <td className="py-2 font-medium text-slate-700">{r.nama}</td>
                     <td className="py-2 text-slate-500">{r.regu}</td>
-                    <td className="py-2 text-right"><StatusBadge status={r.status} /></td>
+                    <td className="py-2 text-right">
+                      <StatusBadge status={r.status} />
+                    </td>
                   </tr>
                 ))}
               </tbody>

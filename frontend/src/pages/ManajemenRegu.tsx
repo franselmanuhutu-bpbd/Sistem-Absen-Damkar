@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ArrowRightLeft, Flame, Star, Loader2, Pencil, Crown, History, RotateCcw } from "lucide-react";
 import { toast } from "sonner";
+import { TableSkeleton } from "@/components/ui/table-skeleton";
 
 const today = new Date().toISOString().slice(0, 10);
 
@@ -167,7 +168,7 @@ export default function ManajemenRegu() {
             </Button>
           </div>
         </div>
-        {loading ? <div className="flex justify-center py-16"><Loader2 className="h-6 w-6 animate-spin text-slate-400" /></div> : (detail?.members?.length || 0) === 0 ? (
+        {loading ? <TableSkeleton rows={8} columns={5} /> : (detail?.members?.length || 0) === 0 ? (
           <p className="py-16 text-center text-slate-400">Belum ada anggota di regu ini.</p>
         ) : (
           <div className="overflow-x-auto">

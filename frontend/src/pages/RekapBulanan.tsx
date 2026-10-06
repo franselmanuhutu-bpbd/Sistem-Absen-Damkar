@@ -1,12 +1,14 @@
 import { useEffect, useState, useCallback } from "react";
 import api, { downloadFile, apiError } from "@/lib/api";
 import { STATUSES, STATUS_CONFIG, monthLabel } from "@/lib/constants";
-import { Input } from "@/components/ui/input";
+import { MonthPicker } from "@/components/MonthPicker";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { FileSpreadsheet, FileText, Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import { TableSkeleton } from "@/components/ui/table-skeleton";
+import { Skeleton } from "@/components/ui/skeleton";
 
 const curMonth = new Date().toISOString().slice(0, 7);
 
@@ -61,8 +63,8 @@ export default function RekapBulanan() {
           <h2 className="font-heading text-2xl font-bold text-slate-900">Rekap Bulanan</h2>
           <p className="text-sm text-slate-500">Rekap kehadiran {monthLabel(month)}</p>
         </div>
-        <div className="flex flex-wrap gap-1">
-          <Input type="month" data-testid="rekap-month" value={month} onChange={(e) => setMonth(e.target.value)} className="h-10 w-40 bg-white" />
+        <div className="flex flex-wrap items-center gap-2">
+          <MonthPicker value={month} onChange={setMonth} data-testid="rekap-month" />
           <Select value={teamId} onValueChange={setTeamId}>
             <SelectTrigger className="h-10 w-40 bg-white" data-testid="rekap-team"><SelectValue /></SelectTrigger>
             <SelectContent>
@@ -88,21 +90,38 @@ export default function RekapBulanan() {
       </div>
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-7">
-        <Card className="border-slate-200 bg-slate-900 p-3 text-center text-white">
-          <p className="text-2xl font-extrabold">{data?.total_pegawai ?? 0}</p>
-          <p className="text-[11px] text-slate-300">Pegawai</p>
-        </Card>
-        {STATUSES.map((s) => (
-          <Card key={s} className={`border p-3 text-center ${STATUS_CONFIG[s].badge}`}>
-            <p className="text-2xl font-extrabold">{g[s] ?? 0}</p>
-            <p className="text-[11px] font-semibold">{s}</p>
-          </Card>
-        ))}
+        {loading ? (
+          <>
+            <Card className="border-slate-200 bg-slate-900 p-3 text-center text-white">
+              <Skeleton className="mx-auto h-8 w-12 bg-slate-800" />
+              <p className="mt-1 text-[11px] text-slate-300">Pegawai</p>
+            </Card>
+            {STATUSES.map((s) => (
+              <Card key={s} className="border border-slate-200 p-3 text-center">
+                <Skeleton className="mx-auto h-8 w-10" />
+                <p className="mt-1 text-[11px] font-semibold text-slate-400">{s}</p>
+              </Card>
+            ))}
+          </>
+        ) : (
+          <>
+            <Card className="border-slate-200 bg-slate-900 p-3 text-center text-white">
+              <p className="text-2xl font-extrabold">{data?.total_pegawai ?? 0}</p>
+              <p className="text-[11px] text-slate-300">Pegawai</p>
+            </Card>
+            {STATUSES.map((s) => (
+              <Card key={s} className={`border p-3 text-center ${STATUS_CONFIG[s].badge}`}>
+                <p className="text-2xl font-extrabold">{g[s] ?? 0}</p>
+                <p className="text-[11px] font-semibold">{s}</p>
+              </Card>
+            ))}
+          </>
+        )}
       </div>
 
       <Card className="overflow-hidden border-slate-200">
         {loading ? (
-          <div className="flex justify-center py-16"><Loader2 className="h-6 w-6 animate-spin text-slate-400" /></div>
+          <TableSkeleton rows={8} columns={8} />
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
