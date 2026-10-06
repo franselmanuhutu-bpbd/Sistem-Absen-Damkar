@@ -471,6 +471,17 @@ async def team_members(team_id: str, date: str = None, user: dict = Depends(get_
     return emps
 
 
+@api.post("/assignments/reset")
+async def reset_assignments(team_id: str = None, user: dict = Depends(require_roles("admin"))):
+    """Kosongkan seluruh penempatan regu (atau satu regu) agar bisa ditata ulang dari awal.
+    Data absensi tidak dihapus."""
+    q = {"team_id": team_id} if team_id else {}
+    res = await db.team_assignments.delete_many(q)
+    scope = "regu terpilih" if team_id else "semua regu"
+    await write_audit(user, "Reset penempatan regu", detail=f"{res.deleted_count} penempatan dihapus ({scope})")
+    return {"deleted": res.deleted_count}
+
+
 # ---------------------------------------------------------------------------
 # Attendance
 # ---------------------------------------------------------------------------
@@ -663,7 +674,7 @@ async def _compute_recap(start_month: str, end_month: str, team_id: Optional[str
             continue
         counts = emp_status.get(eid, {s: 0 for s in STATUSES})
         total = sum(counts.values())
-        seen = sorted([(k[1], emp_team_first[k]) for k in emp_team_first if k[0] == eid], key=lambda x: x[1])
+        seen = sorted([(k[1], emp_team_first[k]) for k in emp_team_first if k[0] == eid], key=lambda x: (x[1] or "", x[0] or ""))
         team_ids_ordered = [t for t, _ in seen]
         if team_ids_ordered:
             regu_label = " → ".join(teams.get(t, {}).get("name", "-") for t in team_ids_ordered)
@@ -678,7 +689,7 @@ async def _compute_recap(start_month: str, end_month: str, team_id: Optional[str
             "team_ids": team_ids_ordered, "regu": regu_label,
             **counts, "total": total,
         })
-        emp_breaks = sorted([(k, v) for k, v in mt.items() if k[0] == eid], key=lambda kv: (kv[0][2], kv[0][1]))
+        emp_breaks = sorted([(k, v) for k, v in mt.items() if k[0] == eid], key=lambda kv: (kv[0][2], kv[0][1] or ""))
         for (ee, tid, mo), cc in emp_breaks:
             breakdown.append({
                 "employee_id": eid, "no": e["no"], "nip": e["nip"], "nama": e["nama"],

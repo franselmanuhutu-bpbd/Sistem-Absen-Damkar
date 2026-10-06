@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowRightLeft, Flame, Star, Loader2, Pencil, Crown, History } from "lucide-react";
+import { ArrowRightLeft, Flame, Star, Loader2, Pencil, Crown, History, RotateCcw } from "lucide-react";
 import { toast } from "sonner";
 
 const today = new Date().toISOString().slice(0, 10);
@@ -27,6 +27,7 @@ export default function ManajemenRegu() {
   const [ksForm, setKsForm] = useState(null);
   const [hist, setHist] = useState(null);
   const [histData, setHistData] = useState([]);
+  const [resetOpen, setResetOpen] = useState(false);
   const isAdmin = user?.role === "admin";
 
   const loadTeams = () => api.get("/teams").then((r) => { setTeams(r.data); if (!activeTeam && r.data[0]) setActiveTeam(r.data[0].id); });
@@ -72,15 +73,44 @@ export default function ManajemenRegu() {
     setHist(true);
     api.get(`/teams/${activeTeam}/history`).then((r) => setHistData(r.data));
   };
+  const submitReset = async () => {
+    try {
+      const { data } = await api.post("/assignments/reset");
+      toast.success(`${data.deleted} penempatan dihapus. Semua regu kini kosong — silakan tata ulang anggota satu per satu.`);
+      setResetOpen(false);
+      loadDetail(activeTeam); loadEmp();
+    } catch (e) { toast.error(apiError(e)); }
+  };
 
   const curTeam = teams.find((t) => t.id === activeTeam);
 
   return (
     <div className="space-y-5">
-      <div>
-        <h2 className="font-heading text-2xl font-bold text-slate-900">Struktur Organisasi &amp; Rolling</h2>
-        <p className="text-sm text-slate-500">Kelola Kasubid, 6 regu, Komandan Regu, dan rolling pegawai berbasis periode.</p>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h2 className="font-heading text-2xl font-bold text-slate-900">Struktur Organisasi &amp; Rolling</h2>
+          <p className="text-sm text-slate-500">Kelola Kasubid, 6 regu, Komandan Regu, dan rolling pegawai berbasis periode.</p>
+        </div>
+        {isAdmin && (
+          <Button variant="outline" onClick={() => setResetOpen(true)} data-testid="reset-assignments-btn" className="gap-2 border-rose-200 text-rose-600 hover:bg-rose-50">
+            <RotateCcw className="h-4 w-4" /> Reset Penempatan Regu
+          </Button>
+        )}
       </div>
+
+      <Dialog open={resetOpen} onOpenChange={setResetOpen}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Reset Penempatan Regu</DialogTitle></DialogHeader>
+          <div className="space-y-3">
+            <p className="text-sm text-slate-600">Tindakan ini mengosongkan <b>seluruh penempatan pegawai pada semua regu</b>, sehingga Anda dapat menata ulang anggota satu per satu dari awal melalui tombol <b>Rolling</b> / <b>Pindahkan</b>.</p>
+            <p className="rounded-lg bg-rose-50 p-2.5 text-xs text-rose-700">⚠️ Data absensi yang sudah tersimpan TIDAK dihapus. Komandan Regu &amp; Kasubid juga tidak terpengaruh. Rekap akan mengikuti penempatan baru yang Anda buat.</p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setResetOpen(false)}>Batal</Button>
+            <Button onClick={submitReset} className="bg-rose-600 hover:bg-rose-700" data-testid="reset-confirm-btn">Ya, Reset Semua</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Kasubid */}
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
