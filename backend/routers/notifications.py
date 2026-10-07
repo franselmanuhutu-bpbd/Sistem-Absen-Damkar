@@ -75,7 +75,7 @@ async def unsubscribe_push(
     endpoint = payload.get("endpoint")
     if not endpoint:
         raise HTTPException(status_code=400, detail="Endpoint wajib disertakan")
-    await delete_push_subscription(endpoint)
+    await delete_push_subscription(endpoint, user_id=user.get("id"))
     return {"status": "unsubscribed"}
 
 

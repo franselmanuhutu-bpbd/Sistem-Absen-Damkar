@@ -1,3 +1,4 @@
+import os
 from fastapi import FastAPI, APIRouter
 from starlette.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
@@ -103,13 +104,30 @@ async def root():
 
 
 # CORS Middleware
+ALLOWED_ORIGINS = [
+    "https://sistem-absen-damkar.vercel.app",
+    "http://localhost:3000",
+    "http://localhost:5173",
+    "http://127.0.0.1:3000",
+    "http://127.0.0.1:5173",
+    "http://localhost:8000",
+    "http://127.0.0.1:8000",
+]
+
+# Allow additional origins from environment variable if set
+custom_origins = os.environ.get("ALLOWED_ORIGINS")
+if custom_origins:
+    ALLOWED_ORIGINS.extend([o.strip() for o in custom_origins.split(",") if o.strip()])
+
 app.add_middleware(
     CORSMiddleware,
+    allow_origins=ALLOWED_ORIGINS,
+    allow_origin_regex=r"^https:\/\/sistem-absen-damkar.*\.vercel\.app$",
     allow_credentials=True,
-    allow_origins="*",
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
 
 
 if __name__ == "__main__":

@@ -40,7 +40,10 @@ self.addEventListener("push", (event) => {
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
 
-  const targetUrl = (event.notification.data && event.notification.data.url) || "/laporan";
+  let targetUrl = (event.notification.data && event.notification.data.url) || "/laporan-export";
+  if (typeof targetUrl !== "string" || !targetUrl.startsWith("/") || targetUrl.startsWith("//")) {
+    targetUrl = "/laporan-export";
+  }
 
   event.waitUntil(
     self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((clientList) => {

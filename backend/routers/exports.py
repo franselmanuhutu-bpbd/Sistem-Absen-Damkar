@@ -23,6 +23,13 @@ KOP = {
 }
 
 
+def sanitize_excel_cell(v):
+    """Prevent CSV / Formula Injection (CWE-1236) in generated spreadsheets."""
+    if isinstance(v, str) and v.startswith(("=", "+", "-", "@", "\t", "\r")):
+        return f"'{v}"
+    return v
+
+
 @router.get("/export/excel")
 async def export_excel(
     start: str,
@@ -87,7 +94,7 @@ async def export_excel(
     for row in data["rows"]:
         vals = [row["no"], row["nip"], row["nama"], row["regu"], row["category"], row["jabatan"]] + [row[s] for s in STATUSES] + [row["jumlah_hari_kerja"], row["total_kehadiran"]]
         for i, v in enumerate(vals, 1):
-            cell = ws.cell(row=r, column=i, value=v)
+            cell = ws.cell(row=r, column=i, value=sanitize_excel_cell(v))
             cell.border = border
             cell.font = data_font
             if i == 3:  # Nama: Left Center
@@ -131,7 +138,7 @@ async def export_excel(
         for b in data["breakdown"]:
             vals = [b["no"], b["nama"], b["regu"], b["month_label"]] + [b[s] for s in STATUSES] + [b["jumlah_hari_kerja"], b["total_kehadiran"]]
             for i, v in enumerate(vals, 1):
-                c = wb2.cell(row=rr, column=i, value=v)
+                c = wb2.cell(row=rr, column=i, value=sanitize_excel_cell(v))
                 c.border = border
                 c.font = data_font
                 if i == 2:  # Nama: Left Center
@@ -173,7 +180,7 @@ async def export_excel(
                 rec["status"], STATUS_LABEL.get(rec["status"])
             ]
             for i, v in enumerate(vals, 1):
-                c = wb3.cell(row=rr, column=i, value=v)
+                c = wb3.cell(row=rr, column=i, value=sanitize_excel_cell(v))
                 c.border = border
                 c.font = data_font
                 if i == 3:  # Nama: Left Center
@@ -514,7 +521,7 @@ async def export_kasubid_excel(
     for i, p in enumerate(data["positions"], 1):
         vals = [i, p["nama"], p["label"]] + [p[s] for s in STATUSES] + [p["jumlah_hari_kerja"], p["total_kehadiran"]]
         for j, v in enumerate(vals, 1):
-            c = ws.cell(row=r, column=j, value=v)
+            c = ws.cell(row=r, column=j, value=sanitize_excel_cell(v))
             c.border = border
             c.font = data_font
             if j == 2:  # Nama: Left Center
@@ -564,7 +571,7 @@ async def export_kasubid_excel(
         for mo in p["monthly"]:
             vals = [p["nama"], p["label"], mo["month_label"]] + [mo[s] for s in STATUSES] + [mo["jumlah_hari_kerja"], mo["total_kehadiran"]]
             for j, v in enumerate(vals, 1):
-                c = ws2.cell(row=r, column=j, value=v)
+                c = ws2.cell(row=r, column=j, value=sanitize_excel_cell(v))
                 c.border = border
                 c.font = data_font
                 if j == 1:  # Nama: Left Center
@@ -591,7 +598,7 @@ async def export_kasubid_excel(
     for d in data["detail"]:
         vals = [d["date"], d["nama"], d["label"], d["status"], STATUS_LABEL.get(d["status"])]
         for j, v in enumerate(vals, 1):
-            c = ws3.cell(row=r, column=j, value=v)
+            c = ws3.cell(row=r, column=j, value=sanitize_excel_cell(v))
             c.border = border
             c.font = data_font
             if j == 2:  # Nama: Left Center

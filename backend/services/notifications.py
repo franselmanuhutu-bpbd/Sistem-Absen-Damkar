@@ -47,9 +47,12 @@ def _save_local_sub(sub: Dict[str, Any]):
         json.dump(subs, f, indent=2, default=str)
 
 
-def _delete_local_sub(endpoint: str):
+def _delete_local_sub(endpoint: str, user_id: Optional[str] = None):
     subs = _ensure_local_store()
-    subs = [s for s in subs if s.get("endpoint") != endpoint]
+    if user_id:
+        subs = [s for s in subs if not (s.get("endpoint") == endpoint and s.get("user_id") == user_id)]
+    else:
+        subs = [s for s in subs if s.get("endpoint") != endpoint]
     with open(LOCAL_SUBS_FILE, "w", encoding="utf-8") as f:
         json.dump(subs, f, indent=2, default=str)
 
@@ -105,12 +108,15 @@ async def save_push_subscription(
     return sub_data
 
 
-async def delete_push_subscription(endpoint: str):
+async def delete_push_subscription(endpoint: str, user_id: Optional[str] = None):
     """Remove expired or unsubscribed endpoint."""
-    _delete_local_sub(endpoint)
+    _delete_local_sub(endpoint, user_id=user_id)
     try:
         db = await get_db()
-        await db.table("push_subscriptions").delete().eq("endpoint", endpoint).execute()
+        q = db.table("push_subscriptions").delete().eq("endpoint", endpoint)
+        if user_id:
+            q = q.eq("user_id", user_id)
+        await q.execute()
     except Exception as exc:
         logger.warning(f"[PUSH] Error deleting subscription from DB: {exc}")
 

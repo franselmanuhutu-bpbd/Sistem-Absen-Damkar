@@ -24,7 +24,10 @@ async def list_employees(
     if status in ("ACTIVE", "INACTIVE"):
         query = query.eq("status", status)
     if search:
-        query = query.or_(f"nama.ilike.%{search}%,nip.ilike.%{search}%")
+        import re
+        clean_search = re.sub(r"[,.()%\"':\\]", "", search.strip())
+        if clean_search:
+            query = query.or_(f"nama.ilike.%{clean_search}%,nip.ilike.%{clean_search}%")
     res = await query.order("no").limit(5000).execute()
     employees = res.data or []
 
@@ -102,7 +105,16 @@ async def employee_assignments(eid: str, user: dict = Depends(get_current_user))
 @router.post("/employees/import")
 async def import_employees(file: UploadFile = File(...), user: dict = Depends(require_roles("admin"))):
     import pandas as pd
+
+    filename = (file.filename or "").lower()
+    if not (filename.endswith(".xlsx") or filename.endswith(".xls")):
+        raise HTTPException(status_code=400, detail="Format file harus berupa Excel (.xlsx atau .xls)")
+
+    MAX_FILE_SIZE = 5 * 1024 * 1024  # 5 MB
     content = await file.read()
+    if len(content) > MAX_FILE_SIZE:
+        raise HTTPException(status_code=400, detail="Ukuran file Excel melebihi batas maksimal 5 MB")
+
     try:
         df = pd.read_excel(io.BytesIO(content), dtype=str)
     except Exception as e:

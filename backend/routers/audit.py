@@ -25,9 +25,10 @@ ALLOWED_TABLE_NAMES = {t["name"] for t in BACKUP_TABLES}
 
 
 @router.get("/audit")
-async def audit_log(limit: int = 200, user: dict = Depends(get_current_user)):
+async def audit_log(limit: int = 200, user: dict = Depends(require_roles("admin"))):
+    capped_limit = min(max(1, limit), 500)
     db = await get_db()
-    res = await db.table("audit_logs").select("*").order("timestamp", desc=True).limit(limit).execute()
+    res = await db.table("audit_logs").select("*").order("timestamp", desc=True).limit(capped_limit).execute()
     return res.data or []
 
 

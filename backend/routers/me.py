@@ -38,8 +38,15 @@ async def my_profile(user: dict = Depends(get_current_user)):
     }
 
 
+import re
+
+MONTH_REGEX = re.compile(r"^\d{4}-(0[1-9]|1[0-2])$")
+
+
 @router.get("/me/recap")
 async def my_recap(start: str, end: str, user: dict = Depends(get_current_user)):
+    if not MONTH_REGEX.match(start or "") or not MONTH_REGEX.match(end or ""):
+        raise HTTPException(status_code=400, detail="Format bulan mulai dan selesai harus YYYY-MM.")
     eid = await _require_employee(user)
     db = await get_db()
     ey, em = int(end[:4]), int(end[5:7])
@@ -63,6 +70,8 @@ async def my_recap(start: str, end: str, user: dict = Depends(get_current_user))
 
 @router.get("/me/calendar")
 async def my_calendar(month: str, user: dict = Depends(get_current_user)):
+    if not MONTH_REGEX.match(month or ""):
+        raise HTTPException(status_code=400, detail="Format bulan tidak valid. Gunakan format YYYY-MM.")
     eid = await _require_employee(user)
     db = await get_db()
     y, m = int(month[:4]), int(month[5:7])

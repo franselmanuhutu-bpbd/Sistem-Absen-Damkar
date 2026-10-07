@@ -45,15 +45,27 @@ async def create_user(body: UserIn, user: dict = Depends(require_roles("admin"))
 
 @router.put("/users/{uid}")
 async def update_user(uid: str, body: UserIn, user: dict = Depends(require_roles("admin"))):
+    if body.role not in ALLOWED_ROLES:
+        raise HTTPException(status_code=400, detail="Role tidak valid")
+
+    if uid == user["id"] and (body.status == "INACTIVE" or body.role != "admin"):
+        raise HTTPException(status_code=400, detail="Tidak dapat menonaktifkan atau mengubah role akun Anda sendiri")
+
     db = await get_db()
     existing = (await db.table("users").select("id").eq("id", uid).execute()).data
     if not existing:
         raise HTTPException(status_code=404, detail="User tidak ditemukan")
+
+    email_clean = body.email.lower().strip()
+    dup = (await db.table("users").select("id").eq("email", email_clean).neq("id", uid).execute()).data
+    if dup:
+        raise HTTPException(status_code=400, detail="Email sudah terdaftar oleh pengguna lain")
+
     update = {
         "name": body.name,
         "role": body.role,
         "status": body.status,
-        "email": body.email.lower().strip(),
+        "email": email_clean,
         "employee_id": body.employee_id or None,
     }
     if body.password:

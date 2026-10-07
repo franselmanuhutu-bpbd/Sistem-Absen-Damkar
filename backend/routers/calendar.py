@@ -1,4 +1,5 @@
-from fastapi import APIRouter, Depends
+import re
+from fastapi import APIRouter, Depends, HTTPException
 from typing import Optional
 
 from config import STATUSES
@@ -8,9 +9,14 @@ from utils import last_day_of_month
 
 router = APIRouter(tags=["Calendar"])
 
+MONTH_REGEX = re.compile(r"^\d{4}-(0[1-9]|1[0-2])$")
+
 
 @router.get("/calendar")
 async def calendar_view(month: str, team_id: str = None, user: dict = Depends(get_current_user)):
+    if not MONTH_REGEX.match(month or ""):
+        raise HTTPException(status_code=400, detail="Format bulan tidak valid. Gunakan format YYYY-MM.")
+
     db = await get_db()
     y, m = int(month[:4]), int(month[5:7])
     ld = last_day_of_month(y, m)

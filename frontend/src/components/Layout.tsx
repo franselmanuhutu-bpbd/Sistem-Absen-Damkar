@@ -262,15 +262,6 @@ export function Layout({ children }: { children: ReactNode }) {
                 >
                   <LogOut className="h-3.5 w-3.5" /> Keluar
                 </Button>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => setCollapsed(true)}
-                  className="h-8 w-8 text-slate-400 hover:bg-white/5 hover:text-white shrink-0"
-                  title="Ciutkan Sidebar"
-                >
-                  <PanelLeftClose className="h-3.5 w-3.5" />
-                </Button>
               </motion.div>
             </>
           )}

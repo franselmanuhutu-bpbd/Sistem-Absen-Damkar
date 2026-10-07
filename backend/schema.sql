@@ -160,10 +160,15 @@ CREATE POLICY "service_role_audit_logs_all" ON public.audit_logs FOR ALL TO serv
 DROP POLICY IF EXISTS "service_role_push_subs_all" ON public.push_subscriptions;
 CREATE POLICY "service_role_push_subs_all" ON public.push_subscriptions FOR ALL TO service_role USING (true) WITH CHECK (true);
 
--- Grant privileges
-GRANT ALL ON ALL TABLES IN SCHEMA public TO postgres, anon, authenticated, service_role;
-GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO postgres, anon, authenticated, service_role;
-GRANT ALL ON ALL ROUTINES IN SCHEMA public TO postgres, anon, authenticated, service_role;
+-- Principle of Least Privilege: Revoke public/unauthenticated direct table access
+REVOKE ALL ON ALL TABLES IN SCHEMA public FROM anon, authenticated;
+REVOKE ALL ON ALL SEQUENCES IN SCHEMA public FROM anon, authenticated;
+REVOKE ALL ON ALL ROUTINES IN SCHEMA public FROM anon, authenticated;
+
+-- Grant privileges strictly to trusted internal roles (FastAPI backend uses service_role)
+GRANT ALL ON ALL TABLES IN SCHEMA public TO postgres, service_role;
+GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO postgres, service_role;
+GRANT ALL ON ALL ROUTINES IN SCHEMA public TO postgres, service_role;
 
 -- Notify PostgREST to refresh schema cache
 NOTIFY pgrst, 'reload schema';
