@@ -66,14 +66,14 @@ export default function RekapBulanan() {
         <div className="flex flex-wrap items-center gap-2">
           <MonthPicker value={month} onChange={setMonth} data-testid="rekap-month" />
           <Select value={teamId} onValueChange={setTeamId}>
-            <SelectTrigger className="h-10 w-40 bg-white" data-testid="rekap-team"><SelectValue /></SelectTrigger>
+            <SelectTrigger className="h-10 w-42 bg-white" data-testid="rekap-team"><SelectValue /></SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Semua Regu</SelectItem>
               {teams.map((t) => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}
             </SelectContent>
           </Select>
           <Select value={category} onValueChange={setCategory}>
-            <SelectTrigger className="h-10 w-36 bg-white" data-testid="rekap-category"><SelectValue /></SelectTrigger>
+            <SelectTrigger className="h-10 w-38 bg-white" data-testid="rekap-category"><SelectValue /></SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Semua Kategori</SelectItem>
               <SelectItem value="Staff">Staff</SelectItem>
@@ -134,7 +134,8 @@ export default function RekapBulanan() {
                   <th className="px-3 py-3">Kategori</th>
                   <th className="hidden px-3 py-3 lg:table-cell">Jabatan</th>
                   {STATUSES.map((s) => <th key={s} className="px-2 py-3 text-center">{s}</th>)}
-                  <th className="px-3 py-3 text-center">Total</th>
+                  <th className="px-3 py-3 text-center">Jumlah Hari Kerja</th>
+                  <th className="px-3 py-3 text-center">Total Kehadiran</th>
                 </tr>
               </thead>
               <tbody>
@@ -151,7 +152,8 @@ export default function RekapBulanan() {
                         <span className={r[s] > 0 ? STATUS_CONFIG[s].text : "text-slate-300"}>{r[s]}</span>
                       </td>
                     ))}
-                    <td className="px-3 py-2.5 text-center font-extrabold text-slate-900">{r.total}</td>
+                    <td className="px-3 py-2.5 text-center font-semibold text-slate-700">{r.jumlah_hari_kerja}</td>
+                    <td className="px-3 py-2.5 text-center font-extrabold text-slate-900">{r.total_kehadiran}</td>
                   </tr>
                 ))}
               </tbody>
@@ -159,8 +161,11 @@ export default function RekapBulanan() {
                 <tr className="bg-slate-100 font-bold text-slate-800">
                   <td className="px-3 py-3" colSpan={5}>TOTAL ({data?.total_pegawai || 0} pegawai)</td>
                   <td className="hidden lg:table-cell" />
-                  {STATUSES.map((s) => <td key={s} className="px-2 py-3 text-center">{g[s] ?? 0}</td>)}
-                  <td className="px-3 py-3 text-center">{STATUSES.reduce((a, s) => a + (g[s] || 0), 0)}</td>
+                  {STATUSES.map((s) => (
+                    <td key={s} className="px-2 py-3 text-center">{g[s] ?? 0}</td>
+                  ))}
+                  <td className="px-3 py-3 text-center">{(data?.rows || []).reduce((a, r) => a + (r.jumlah_hari_kerja || 0), 0)}</td>
+                  <td className="px-3 py-3 text-center">{g.HDR ?? 0}</td>
                 </tr>
               </tfoot>
             </table>

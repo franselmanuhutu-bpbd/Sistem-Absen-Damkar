@@ -167,6 +167,7 @@ async def _compute_recap(start_month: str, end_month: str, team_id: Optional[str
     rows = []
     breakdown = []
     grand = {s: 0 for s in STATUSES}
+    jumlah_hari_kerja = sum(last_day_of_month(int(m[:4]), int(m[5:7])) for m in months)
 
     for e in employees:
         eid = e["id"]
@@ -192,7 +193,8 @@ async def _compute_recap(start_month: str, end_month: str, team_id: Optional[str
             "employee_id": eid, "no": e["no"], "nip": e["nip"], "nama": e["nama"],
             "jabatan": e["jabatan"], "pangkat": e["pangkat"], "category": cat,
             "team_ids": team_ids_ordered, "regu": regu_label,
-            **counts, "total": total,
+            **counts, "total": total, "jumlah_hari_kerja": jumlah_hari_kerja,
+            "total_kehadiran": counts["HDR"],
         })
         emp_breaks = sorted([(k, v) for k, v in mt.items() if k[0] == eid], key=lambda kv: (kv[0][2], kv[0][1] or ""))
         for (ee, tid, mo), cc in emp_breaks:

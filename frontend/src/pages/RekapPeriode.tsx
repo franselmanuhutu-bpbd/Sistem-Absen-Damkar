@@ -182,7 +182,8 @@ export default function RekapPeriode() {
                       <th className="px-3 py-3">Regu</th>
                       <th className="px-3 py-3">Kategori</th>
                       {STATUSES.map((s) => <th key={s} className="px-2 py-3 text-center">{s}</th>)}
-                      <th className="px-3 py-3 text-center">Total</th>
+                      <th className="px-3 py-3 text-center">Jumlah Hari Kerja</th>
+                      <th className="px-3 py-3 text-center">Total Kehadiran</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -193,8 +194,12 @@ export default function RekapPeriode() {
                         <td className="px-3 py-2.5 font-semibold text-slate-800">{r.nama}</td>
                         <td className="px-3 py-2.5 text-slate-500">{r.regu}</td>
                         <td className="px-3 py-2.5"><span className={`rounded px-2 py-0.5 text-xs font-semibold ${r.category === "Kasubid" ? "bg-amber-100 text-amber-700" : "bg-slate-100 text-slate-600"}`}>{r.category}</span></td>
-                        {STATUSES.map((s) => <td key={s} className="px-2 py-2.5 text-center font-semibold"><span className={r[s] > 0 ? STATUS_CONFIG[s].text : "text-slate-300"}>{r[s]}</span></td>)}
-                        <td className="px-3 py-2.5 text-center font-extrabold">{r.total}</td>
+                        {STATUSES.map((s) => (
+                          <td key={s} className="px-2 py-2.5 text-center font-semibold">
+                            <span className={r[s] > 0 ? STATUS_CONFIG[s].text : "text-slate-300"}>{r[s]}</span>
+                          </td>))}
+                        <td className="px-3 py-2.5 text-center font-extrabold text-slate-700">{r.jumlah_hari_kerja}</td>
+                        <td className="px-3 py-2.5 text-center font-extrabold text-slate-900">{r.total_kehadiran}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -202,7 +207,8 @@ export default function RekapPeriode() {
                     <tr className="bg-slate-100 font-bold">
                       <td className="px-3 py-3" colSpan={5}>TOTAL</td>
                       {STATUSES.map((s) => <td key={s} className="px-2 py-3 text-center">{g[s] ?? 0}</td>)}
-                      <td className="px-3 py-3 text-center">{STATUSES.reduce((a, s) => a + (g[s] || 0), 0)}</td>
+                      <td className="px-3 py-3 text-center">{(data?.rows || []).reduce((a, r) => a + (r.jumlah_hari_kerja || 0), 0)}</td>
+                      <td className="px-3 py-3 text-center">{g.HDR ?? 0}</td>
                     </tr>
                   </tfoot>
                 </table>

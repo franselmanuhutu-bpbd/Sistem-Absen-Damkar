@@ -65,7 +65,7 @@ async def export_excel(
 
     ws = wb.active
     ws.title = "Ringkasan"
-    cols = ["No", "NIP", "Nama", "Regu", "Kategori", "Jabatan"] + STATUSES + ["Total"]
+    cols = ["No", "NIP", "Nama", "Regu", "Kategori", "Jabatan"] + STATUSES + ["Jumlah Hari Kerja", "Total Kehadiran"]
     ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=len(cols))
     ws.cell(row=1, column=1, value=f"{KOP['l1']} {KOP['l2']} \u2014 {KOP['l3']}").font = title_font
     ws.cell(row=1, column=1).alignment = center
@@ -82,7 +82,7 @@ async def export_excel(
     style_header(ws, hr, len(cols))
     r = hr + 1
     for row in data["rows"]:
-        vals = [row["no"], row["nip"], row["nama"], row["regu"], row["category"], row["jabatan"]] + [row[s] for s in STATUSES] + [row["total"]]
+        vals = [row["no"], row["nip"], row["nama"], row["regu"], row["category"], row["jabatan"]] + [row[s] for s in STATUSES] + [row["jumlah_hari_kerja"], row["total_kehadiran"]]
         for i, v in enumerate(vals, 1):
             cell = ws.cell(row=r, column=i, value=v)
             cell.border = border
@@ -99,7 +99,8 @@ async def export_excel(
         cell.font = Font(bold=True)
         cell.alignment = center
         cell.border = border
-    ws.cell(row=r, column=13, value=sum(data["grand_total"].values())).font = Font(bold=True)
+    ws.cell(row=r, column=len(cols) - 1, value=sum(row["jumlah_hari_kerja"] for row in data["rows"])).font = Font(bold=True)
+    ws.cell(row=r, column=len(cols), value=data["grand_total"]["HDR"]).font = Font(bold=True)
     autofit(ws, len(cols), hr)
     ws.freeze_panes = ws.cell(row=hr + 1, column=1)
     ws.auto_filter.ref = f"A{hr}:{get_column_letter(len(cols))}{hr}"
@@ -232,8 +233,8 @@ async def export_pdf(
     if include_summary:
         elements.append(Paragraph("RINGKASAN PERIODE", sec_style))
         gt = data["grand_total"]
-        sum_data = [["Total Pegawai"] + [STATUS_LABEL[s] for s in STATUSES] + ["Total"],
-                    [data["total_pegawai"]] + [gt[s] for s in STATUSES] + [sum(gt.values())]]
+        sum_data = [["Total Pegawai"] + [STATUS_LABEL[s] for s in STATUSES] + ["Total Kehadiran"],
+                    [data["total_pegawai"]] + [gt[s] for s in STATUSES] + [gt["HDR"]]]
         st = Table(sum_data, repeatRows=1)
         st.setStyle(TableStyle([
             ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#94A3B8")),
@@ -248,16 +249,16 @@ async def export_pdf(
         elements.append(Spacer(1, 8))
 
         elements.append(Paragraph("REKAP PER PEGAWAI", sec_style))
-        header = ["No", "NIP", "Nama", "Regu", "Kategori", "Jabatan"] + STATUSES + ["Total"]
+        header = ["No", "NIP", "Nama", "Regu", "Kategori", "Jabatan"] + STATUSES + ["Jumlah Hari Kerja", "Total Kehadiran"]
         table_data = [header]
         for row in data["rows"]:
             table_data.append([
                 row["no"], row["nip"], Paragraph(str(row["nama"]), styles["BodyText"]),
                 row["regu"], row["category"], Paragraph(str(row["jabatan"]), styles["BodyText"])
-            ] + [row[s] for s in STATUSES] + [row["total"]])
-        total_row = ["", "", "TOTAL", "", "", ""] + [data["grand_total"][s] for s in STATUSES] + [sum(data["grand_total"].values())]
+            ] + [row[s] for s in STATUSES] + [row["jumlah_hari_kerja"], row["total_kehadiran"]])
+        total_row = ["", "", "TOTAL", "", "", ""] + [data["grand_total"][s] for s in STATUSES] + [sum(row["jumlah_hari_kerja"] for row in data["rows"]), data["grand_total"]["HDR"]]
         table_data.append(total_row)
-        colw = [9 * mm, 30 * mm, 46 * mm, 18 * mm, 20 * mm, 46 * mm] + [12 * mm] * 6 + [14 * mm]
+        colw = [9 * mm, 30 * mm, 46 * mm, 18 * mm, 20 * mm, 46 * mm] + [12 * mm] * 6 + [24 * mm, 24 * mm]
         t = Table(table_data, colWidths=colw, repeatRows=1)
         ts = [
             ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#94A3B8")),
