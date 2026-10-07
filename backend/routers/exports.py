@@ -222,6 +222,25 @@ async def export_pdf(
     title_style = ParagraphStyle("t", parent=styles["Title"], fontSize=13, alignment=TA_CENTER, spaceAfter=2)
     sub_style = ParagraphStyle("s", parent=styles["Normal"], fontSize=10, alignment=TA_CENTER, spaceAfter=2)
     sec_style = ParagraphStyle("sec", parent=styles["Heading2"], fontSize=11, textColor=colors.HexColor("#0F172A"), spaceBefore=8, spaceAfter=4)
+    
+    table_header_style = ParagraphStyle(
+        "table_header",
+        parent=styles["Normal"],
+        fontName="Helvetica-Bold",
+        fontSize=6.5,
+        leading=7.5,
+        alignment=TA_CENTER,
+        textColor=colors.white,
+    )
+
+    table_cell_style = ParagraphStyle(
+        "table_cell",
+        parent=styles["Normal"],
+        fontName="Helvetica",
+        fontSize=6.5,
+        leading=7.5,
+        wordWrap="LTR", # Full word boundaries
+    )
 
     elements = []
     elements.append(Paragraph("REKAPITULASI ABSENSI PEGAWAI", title_style))
@@ -229,6 +248,28 @@ async def export_pdf(
     elements.append(Spacer(1, 6))
 
     status_colors = {s: colors.HexColor("#" + STATUS_HEX[s]) for s in STATUSES}
+
+    table_cell_center_style = ParagraphStyle(
+        f"tabel_center",
+        parent=table_cell_style,
+        textColor=colors.black,
+        fontName="Helvetica-Bold",
+        alignment=TA_CENTER,
+    )
+
+    status_cell_styles = {
+        s: ParagraphStyle(
+            f"table_status_{s}",
+            parent=table_cell_style,
+            textColor=status_colors[s],
+            fontName="Helvetica-Bold",
+            alignment=TA_CENTER,
+        )
+        for s in STATUSES
+    }
+
+    def format_regu(value):
+        return str(value).replace(" - ", "<br/>")
 
     if include_summary:
         elements.append(Paragraph("RINGKASAN PERIODE", sec_style))
@@ -250,28 +291,55 @@ async def export_pdf(
 
         elements.append(Paragraph("REKAP PER PEGAWAI", sec_style))
         header = ["No", "NIP", "Nama", "Regu", "Kategori", "Jabatan"] + STATUSES + ["Jumlah Hari Kerja", "Total Kehadiran"]
-        table_data = [header]
+        table_data = [[Paragraph(str(value), table_header_style) for value in header]]
         for row in data["rows"]:
-            table_data.append([
-                row["no"], row["nip"], Paragraph(str(row["nama"]), styles["BodyText"]),
-                row["regu"], row["category"], Paragraph(str(row["jabatan"]), styles["BodyText"])
-            ] + [row[s] for s in STATUSES] + [row["jumlah_hari_kerja"], row["total_kehadiran"]])
-        total_row = ["", "", "TOTAL", "", "", ""] + [data["grand_total"][s] for s in STATUSES] + [sum(row["jumlah_hari_kerja"] for row in data["rows"]), data["grand_total"]["HDR"]]
+            cells = [
+                Paragraph(str(row["no"]), table_cell_center_style),
+                Paragraph(str(row["nip"]), table_cell_center_style),
+                Paragraph(str(row["nama"]), table_cell_center_style),
+                Paragraph(format_regu(row["regu"]), table_cell_center_style),
+                Paragraph(str(row["category"]), table_cell_center_style),
+                Paragraph(str(row["jabatan"]), table_cell_center_style),
+            ]
+            cells += [
+                Paragraph(str(row[s]), status_cell_styles[s])
+                for s in STATUSES
+            ]
+            cells += [
+                Paragraph(str(row["jumlah_hari_kerja"]), table_cell_center_style),
+                Paragraph(str(row["total_kehadiran"]), table_cell_center_style),
+            ]
+            table_data.append(cells)
+
+        # Bottom of the Table (==== TOTAL ====)
+        total_row = [
+            Paragraph("TOTAL", table_cell_center_style), "", "", "", "", ""
+        ] + [
+            Paragraph(str(data["grand_total"][s]), table_cell_center_style)
+            for s in STATUSES
+        ] + [
+            Paragraph(str(sum(row["jumlah_hari_kerja"] for row in data["rows"])), table_cell_center_style),
+            Paragraph(str(data["grand_total"]["HDR"]), table_cell_center_style),
+        ]
         table_data.append(total_row)
-        colw = [9 * mm, 30 * mm, 46 * mm, 18 * mm, 20 * mm, 46 * mm] + [12 * mm] * 6 + [24 * mm, 24 * mm]
+        
+        colw = [8 * mm, 28 * mm, 40 * mm, 19 * mm, 21 * mm, 40 * mm] + [11 * mm] * 6 + [20 * mm, 20 * mm]
         t = Table(table_data, colWidths=colw, repeatRows=1)
         ts = [
             ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#94A3B8")),
             ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#0F172A")),
             ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
             ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-            ("FONTSIZE", (0, 0), (-1, -1), 7.5),
+            ("LEFTPADDING", (0, 0), (-1, -1), 2),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 2),
+            ("TOPPADDING", (0, 0), (-1, -1), 3.5),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 3.5),
             ("ALIGN", (4, 0), (-1, -1), "CENTER"),
             ("ALIGN", (0, 0), (0, -1), "CENTER"),
             ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
             ("BACKGROUND", (0, -1), (-1, -1), colors.HexColor("#E2E8F0")),
             ("FONTNAME", (0, -1), (-1, -1), "Helvetica-Bold"),
-            ("SPAN", (2, -1), (5, -1)),
+            ("SPAN", (0, -1), (5, -1)),
         ]
         for i, s in enumerate(STATUSES):
             ts.append(("TEXTCOLOR", (6 + i, 1), (6 + i, -2), status_colors[s]))
