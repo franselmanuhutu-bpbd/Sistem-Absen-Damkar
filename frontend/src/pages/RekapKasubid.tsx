@@ -28,10 +28,19 @@ export default function RekapKasubid() {
   const [filterStatus, setFilterStatus] = useState("all");
 
   const load = useCallback(() => {
-    if (start > end) { toast.error("Periode tidak valid"); return; }
+    if (start > end) { 
+      toast.error("Periode tidak valid");
+      return;
+    }
+    
     setLoading(true);
-    api.get("/recap/kasubid", { params: { start, end } }).then((r) => setData(r.data)).catch((e) => toast.error(apiError(e))).finally(() => setLoading(false));
+    api.get("/recap/kasubid", { params: { start, end } })
+      .then((r) => setData(r.data))
+      .catch((e) => toast.error(apiError(e)))
+      .finally(() => setLoading(false));
+
   }, [start, end]);
+
   useEffect(() => { load(); }, [load]);
 
   const doExport = async (type) => {
@@ -143,7 +152,13 @@ export default function RekapKasubid() {
             </Select>
           </div>
           <table className="w-full text-sm">
-            <thead><tr className="border-b text-left text-xs text-slate-500"><th className="py-2">Tanggal</th><th className="py-2">Nama</th><th className="py-2 text-right">Status</th></tr></thead>
+            <thead>
+              <tr className="border-b text-left text-xs text-slate-500">
+                <th className="py-2">Tanggal</th>
+                <th className="py-2">Nama</th>
+                <th className="py-2 text-right">Status</th>
+              </tr>
+            </thead>
             <tbody>
               {detailRows.map((d, i) => (
                 <tr key={i} className="border-b border-slate-100">

@@ -37,6 +37,18 @@ export function monthLabel(ym?: string | null): string {
   return `${monthName} ${y}`;
 }
 
+export function formatDateId(dateStr?: string | null): string {
+  if (!dateStr) return "";
+  const parts = dateStr.split("-");
+  const y = parts[0];
+  const m = parts[1];
+  const d = parts[2];
+  if (!y || !m || !d) return dateStr;
+  const monthIdx = parseInt(m, 10) - 1;
+  const monthName = MONTH_NAMES[monthIdx] || m;
+  return `${parseInt(d, 10)} ${monthName} ${y}`;
+}
+
 export type UserRole = "admin" | "operator" | "viewer" | "komandan" | "kasubid" | "staff";
 
 export const ROLE_LABEL: Record<string, string> = {

@@ -241,12 +241,14 @@ async def _compute_kasubid_recap(start_month: str, end_month: str):
 
     positions = []
     detail = []
+
     for pid, label in KASUBID_POSITIONS:
         counts = {s: 0 for s in STATUSES}
         monthly = {m: {s: 0 for s in STATUSES} for m in months}
         holders = []
         d = _date.fromisoformat(sd)
         end_d = _date.fromisoformat(ed)
+        
         while d <= end_d:
             ds = d.isoformat()
             eid = resolve_kasubid_mem(pid, ds)
@@ -261,6 +263,7 @@ async def _compute_kasubid_recap(start_month: str, end_month: str):
                     detail.append({"date": ds, "position_id": pid, "label": label,
                                    "nama": nm, "status": st})
             d += timedelta(days=1)
+
         positions.append({
             "position_id": pid, "label": label, "holders": holders,
             "nama": " / ".join(holders) if holders else "-",
@@ -268,6 +271,7 @@ async def _compute_kasubid_recap(start_month: str, end_month: str):
             "monthly": [{"month": m, "month_label": _month_label(m), **monthly[m],
                          "total": sum(monthly[m].values())} for m in months],
         })
-    detail.sort(key=lambda x: (x["position_id"], x["date"]))
+
+    detail.sort(key=lambda x: (x["position_id"], x["date"]), reverse=True)
     return {"months": months, "positions": positions, "detail": detail,
             "period_label": _period_label(start_month, end_month)}

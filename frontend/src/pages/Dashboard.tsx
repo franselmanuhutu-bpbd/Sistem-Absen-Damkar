@@ -1,12 +1,12 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { Link } from "react-router-dom";
-import api from "@/lib/api";
-import { STATUSES, STATUS_CONFIG } from "@/lib/constants";
+import api, { apiError } from "@/lib/api";
+import { STATUSES, STATUS_CONFIG, formatDateId } from "@/lib/constants";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { Users, Flame, Star, AlertCircle, ArrowRight } from "lucide-react";
+import { Users, Flame, Star, AlertCircle, ArrowRight, RefreshCw, Calendar, BarChart3 } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 
 function Skeleton({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
@@ -43,6 +43,10 @@ interface KasubidData {
 
 interface DashboardResponse {
   date: string;
+  today?: string;
+  latest_date?: string | null;
+  has_attendance_today?: boolean;
+  is_fallback_to_latest?: boolean;
   total_employees: number;
   totals: Record<string, number>;
   per_team: PerTeamData[];
@@ -58,32 +62,101 @@ function getTodayLocal(): string {
 }
 
 export default function Dashboard() {
-  const [date, setDate] = useState<string>(getTodayLocal);
+  const [date, setDate] = useState<string>("");
   const [data, setData] = useState<DashboardResponse | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [retryToken, setRetryToken] = useState(0);
+  const loadedDateRef = useRef<string | null>(null);
 
   useEffect(() => {
+    // Skip re-fetching if date was set from the response matching loaded data
+    if (date && date === loadedDateRef.current && data) {
+      return;
+    }
+
     let active = true;
+    const startedAt = Date.now();
+    const maxAttempts = 3;
+
+    const isRetryable = (err: any) => {
+      const status = err?.response?.status;
+      return !status || status >= 500 || status === 408 || status === 429;
+    };
+
+    const wait = (milliseconds: number) =>
+      new Promise((resolve) => window.setTimeout(resolve, milliseconds));
+
+    const loadDashboard = async () => {
+      setLoadError(null);
+      let lastError: any;
+
+      for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+        try {
+          const params = date ? { date } : {};
+          const response = await api.get<DashboardResponse>("/dashboard", {
+            params,
+          });
+          if (!response.data?.totals || !Array.isArray(response.data?.per_team)) {
+            throw new Error("Respons dashboard tidak memiliki struktur data yang valid.");
+          }
+          if (active) {
+            setData(response.data);
+            loadedDateRef.current = response.data.date;
+            if (!date && response.data.date) {
+              setDate(response.data.date);
+            }
+            console.info("[Dashboard] Data loaded", {
+              date: response.data.date,
+              attempt,
+              durationMs: Date.now() - startedAt,
+              teams: response.data.per_team.length,
+              totalEmployees: response.data.total_employees,
+            });
+          }
+          return;
+        } catch (err) {
+          lastError = err;
+          console.error("[Dashboard] Load attempt failed", {
+            date,
+            attempt,
+            maxAttempts,
+            status: err?.response?.status,
+            message: err?.message,
+            response: err?.response?.data,
+          });
+
+          if (attempt < maxAttempts && isRetryable(err)) {
+            await wait(500 * 2 ** (attempt - 1));
+          } else {
+            break;
+          }
+        }
+      }
+
+      if (active) {
+        setLoadError(apiError(lastError));
+        console.error("[Dashboard] Failed after retries", {
+          date,
+          durationMs: Date.now() - startedAt,
+          error: lastError,
+        });
+      }
+    };
+
     setLoading(true);
-    api
-      .get("/dashboard", { params: { date } })
-      .then((r) => {
-        if (active) setData(r.data);
-      })
-      .catch((err) => {
-        console.error("Gagal memuat data dashboard:", err);
-      })
-      .finally(() => {
-        if (active) setLoading(false);
-      });
+    loadDashboard().finally(() => {
+      if (active) setLoading(false);
+    });
 
     return () => {
       active = false;
     };
-  }, [date]);
+  }, [date, retryToken]);
 
   const totals = data?.totals || {};
   const totalRecorded = Object.values(totals).reduce((a, b) => a + (b || 0), 0);
+  const showSkeleton = loading || !data;
   const chartData = (data?.per_team || []).map((t) => ({
     name: t.team.name.replace("Regu ", "R"),
     ...STATUSES.reduce((a, s) => ({ ...a, [s]: t[s] ?? 0 }), {}),
@@ -111,7 +184,7 @@ export default function Dashboard() {
 
       {/* Stat cards */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7">
-        {loading ? (
+        {showSkeleton ? (
           <>
             <Card className="col-span-2 flex items-center gap-4 border-slate-200 bg-[#0F172A] p-5 text-white sm:col-span-1 xl:col-span-1">
               <Skeleton className="h-12 w-12 rounded-xl bg-slate-800" />
@@ -160,7 +233,7 @@ export default function Dashboard() {
       </div>
 
       {/* Org structure: Kasubid */}
-      {loading ? (
+      {showSkeleton ? (
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           {[1, 2].map((i) => (
             <Card key={i} className="flex items-center gap-4 border-slate-200 p-4">
@@ -194,21 +267,95 @@ export default function Dashboard() {
         )
       )}
 
-      {/* Empty notice for date with 0 attendance */}
-      {!loading && totalRecorded === 0 && (
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between rounded-xl border border-amber-200 bg-amber-50/70 p-4 text-amber-900">
-          <div className="flex items-center gap-3">
-            <AlertCircle className="h-5 w-5 text-amber-600 shrink-0" />
+      {!loading && loadError && (
+        <div className="flex flex-col gap-3 rounded-xl border border-red-200 bg-red-50 p-4 text-red-900 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-start gap-3">
+            <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-red-600" />
             <div>
-              <p className="text-sm font-semibold">Belum ada data kehadiran pada tanggal ini</p>
-              <p className="text-xs text-amber-700">Grafik dan statistik kehadiran per regu masih bernilai 0.</p>
+              <p className="text-sm font-semibold">Dashboard gagal dimuat</p>
+              <p className="text-xs text-red-700">{loadError}</p>
+              <p className="mt-1 text-xs text-red-600">Periksa koneksi atau status server, lalu coba lagi.</p>
             </div>
           </div>
-          <Button asChild size="sm" variant="outline" className="border-amber-300 bg-white hover:bg-amber-100/50 text-amber-900 gap-1.5 text-xs self-start sm:self-auto">
-            <Link to="/input-absensi">
-              Input Absensi <ArrowRight className="h-3.5 w-3.5" />
-            </Link>
+          <Button
+            size="sm"
+            variant="outline"
+            className="gap-1.5 self-start border-red-300 bg-white text-red-900 hover:bg-red-100/50 sm:self-auto"
+            onClick={() => setRetryToken((value) => value + 1)}
+          >
+            <RefreshCw className="h-3.5 w-3.5" />
+            Coba lagi
           </Button>
+        </div>
+      )}
+
+      {/* Notice when auto-falling back to latest attendance data */}
+      {!loading && data && data.is_fallback_to_latest && (
+        <div className="flex flex-col gap-3 rounded-xl border border-sky-200 bg-sky-50/80 p-4 text-sky-950 sm:flex-row sm:items-center sm:justify-between shadow-sm">
+          <div className="flex items-start gap-3">
+            <Calendar className="mt-0.5 h-5 w-5 shrink-0 text-sky-600" />
+            <div>
+              <p className="text-sm font-semibold">
+                Menampilkan data absensi terakhir ({formatDateId(data.date)})
+              </p>
+              <p className="text-xs text-sky-700 mt-0.5">
+                Data absensi untuk hari ini ({formatDateId(data.today || getTodayLocal())}) belum diinput.
+              </p>
+            </div>
+          </div>
+          <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
+            {data.today && data.today !== data.date && (
+              <Button
+                size="sm"
+                variant="outline"
+                className="border-sky-300 bg-white hover:bg-sky-100/60 text-sky-900 text-xs gap-1.5"
+                onClick={() => setDate(data.today!)}
+              >
+                Lihat Hari Ini ({formatDateId(data.today)})
+              </Button>
+            )}
+            <Button asChild size="sm" className="bg-sky-700 hover:bg-sky-800 text-white text-xs gap-1.5">
+              <Link to="/input-absensi">
+                Input Absensi Hari Ini <ArrowRight className="h-3.5 w-3.5" />
+              </Link>
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* Empty notice for date with 0 attendance */}
+      {!loading && data && !loadError && totalRecorded === 0 && (
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between rounded-xl border border-amber-200 bg-amber-50/70 p-4 text-amber-900 shadow-sm">
+          <div className="flex items-start gap-3">
+            <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" />
+            <div>
+              <p className="text-sm font-semibold">
+                Belum ada data kehadiran pada tanggal ini ({formatDateId(date || data.date)})
+              </p>
+              <p className="text-xs text-amber-700 mt-0.5">
+                {data.latest_date && data.latest_date !== (date || data.date)
+                  ? `Data absensi terakhir yang tersedia adalah tanggal ${formatDateId(data.latest_date)}.`
+                  : "Grafik dan statistik kehadiran per regu masih bernilai 0."}
+              </p>
+            </div>
+          </div>
+          <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
+            {data.latest_date && data.latest_date !== (date || data.date) && (
+              <Button
+                size="sm"
+                variant="outline"
+                className="border-amber-300 bg-white hover:bg-amber-100/60 text-amber-900 text-xs"
+                onClick={() => setDate(data.latest_date!)}
+              >
+                Tampilkan Data Terakhir ({formatDateId(data.latest_date)})
+              </Button>
+            )}
+            <Button asChild size="sm" className="bg-amber-600 hover:bg-amber-700 text-white text-xs gap-1.5">
+              <Link to="/input-absensi">
+                Input Absensi <ArrowRight className="h-3.5 w-3.5" />
+              </Link>
+            </Button>
+          </div>
         </div>
       )}
 
@@ -230,7 +377,7 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {loading ? (
+        {showSkeleton ? (
           <div className="h-72 w-full flex items-end gap-6 pt-6 pb-2 px-6">
             {[55, 80, 45, 90, 65, 75].map((h, i) => (
               <div key={i} className="flex-1 flex flex-col items-center gap-2 h-full justify-end">
@@ -238,6 +385,26 @@ export default function Dashboard() {
                 <Skeleton className="h-3 w-8" />
               </div>
             ))}
+          </div>
+        ) : totalRecorded === 0 ? (
+          <div className="h-72 w-full flex flex-col items-center justify-center text-center p-6 rounded-lg border border-dashed border-slate-200 bg-slate-50/50">
+            <div className="h-12 w-12 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 mb-3">
+              <BarChart3 className="h-6 w-6" />
+            </div>
+            <p className="text-sm font-semibold text-slate-700">Grafik Kehadiran Kosong</p>
+            <p className="text-xs text-slate-500 max-w-sm mt-1">
+              Belum ada absensi yang diinput pada tanggal {formatDateId(date || data?.date)}.
+            </p>
+            {data?.latest_date && data.latest_date !== (date || data?.date) && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="mt-4 text-xs bg-white border-slate-300 hover:bg-slate-50 text-slate-800"
+                onClick={() => setDate(data.latest_date!)}
+              >
+                Tampilkan Data Terakhir ({formatDateId(data.latest_date)})
+              </Button>
+            )}
           </div>
         ) : (
           <div className="h-72 w-full">
@@ -275,7 +442,7 @@ export default function Dashboard() {
           )}
         </div>
 
-        {loading ? (
+        {showSkeleton ? (
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {[1, 2, 3, 4, 5, 6].map((i) => (
               <Card key={i} className="border-slate-200 p-5">

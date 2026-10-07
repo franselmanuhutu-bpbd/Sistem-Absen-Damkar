@@ -1,3 +1,4 @@
+import asyncio
 from fastapi import APIRouter, Depends
 from datetime import date as _date
 
@@ -16,16 +17,51 @@ router = APIRouter(tags=["Dashboard"])
 @router.get("/dashboard")
 async def dashboard(date: str = None, user: dict = Depends(get_current_user)):
     db = await get_db()
-    ref = date or _date.today().isoformat()
+    today_iso = _date.today().isoformat()
+
+    # Query latest date with attendance records on or before today
+    latest_rec = (
+        await db.table("attendance")
+        .select("date")
+        .lte("date", today_iso)
+        .order("date", desc=True)
+        .limit(1)
+        .execute()
+    ).data or []
+    latest_date = latest_rec[0]["date"] if latest_rec else None
+
+    # Check if today has attendance records
+    today_records = (
+        await db.table("attendance")
+        .select("id")
+        .eq("date", today_iso)
+        .limit(1)
+        .execute()
+    ).data or []
+    has_attendance_today = len(today_records) > 0
+
+    # Determine reference date
+    is_fallback = False
+    cleaned_date = date.strip() if date else None
+    if cleaned_date:
+        ref = cleaned_date
+    else:
+        if has_attendance_today or not latest_date:
+            ref = today_iso
+        else:
+            ref = latest_date
+            is_fallback = True
+
     teams = (await db.table("teams").select("*").order("order").limit(100).execute()).data or []
     team_map = await resolve_teams_for_date(ref)
 
-    active_emps = (await db.table("employees").select("id").eq("status", "ACTIVE").limit(5000).execute()).data or []
+    # Fetch active employees with id and nama to avoid N+1 queries
+    active_emps = (await db.table("employees").select("id, nama").eq("status", "ACTIVE").limit(5000).execute()).data or []
+    active_ids = {e["id"] for e in active_emps}
+    emp_names = {e["id"]: e.get("nama") for e in active_emps}
     total_employees = len(active_emps)
 
     records = (await db.table("attendance").select("*").eq("date", ref).limit(10000).execute()).data or []
-    rec_map = {r["employee_id"]: r["status"] for r in records}
-    rec_team_map = {r["employee_id"]: r.get("team_id") for r in records if r.get("team_id")}
 
     def empty():
         return {s: 0 for s in STATUSES}
@@ -33,36 +69,63 @@ async def dashboard(date: str = None, user: dict = Depends(get_current_user)):
     totals = empty()
     per_team = {t["id"]: {"team": t, "members": 0, **empty()} for t in teams}
     for e in active_emps:
-        tid = team_map.get(e["id"]) or rec_team_map.get(e["id"])
+        tid = team_map.get(e["id"])
         if tid in per_team:
             per_team[tid]["members"] += 1
-        st = rec_map.get(e["id"])
-        if st in STATUSES:
-            totals[st] += 1
-            if tid in per_team:
-                per_team[tid][st] += 1
+
+    for record in records:
+        employee_id = record.get("employee_id")
+        if employee_id not in active_ids:
+            continue
+        status = str(record.get("status") or "").strip().upper()
+        if status not in STATUSES:
+            continue
+        team_id = record.get("team_id") or team_map.get(employee_id)
+        totals[status] += 1
+        if team_id in per_team:
+            per_team[team_id][status] += 1
+
+    # Parallel resolution of kasubid and commanders
+    kasubid_keys = [("KASUBID1", "Kasubid 1"), ("KASUBID2", "Kasubid 2")]
+    kasubid_tasks = [resolve_kasubid_for_date(pid, ref) for pid, _ in kasubid_keys]
+    team_list = list(per_team.values())
+    commander_tasks = [resolve_commander_for_date(t["team"]["id"], ref) for t in team_list]
+
+    resolved_ids = await asyncio.gather(*kasubid_tasks, *commander_tasks)
+    kasubid_eids = resolved_ids[:len(kasubid_keys)]
+    commander_eids = resolved_ids[len(kasubid_keys):]
 
     kasubid = []
-    for pid, plabel in [("KASUBID1", "Kasubid 1"), ("KASUBID2", "Kasubid 2")]:
-        eid = await resolve_kasubid_for_date(pid, ref)
-        emp = (await db.table("employees").select("*").eq("id", eid).execute()).data if eid else None
-        emp_obj = emp[0] if emp else None
-        kasubid.append({"position_id": pid, "label": plabel, "employee_id": eid,
-                        "nama": emp_obj["nama"] if emp_obj else None,
-                        "status": "Aktif" if emp_obj else "Kosong"})
+    for (pid, plabel), eid in zip(kasubid_keys, kasubid_eids):
+        nama = emp_names.get(eid)
+        if not nama and eid:
+            emp = (await db.table("employees").select("nama").eq("id", eid).limit(1).execute()).data
+            nama = emp[0]["nama"] if emp else None
+        kasubid.append({
+            "position_id": pid,
+            "label": plabel,
+            "employee_id": eid,
+            "nama": nama,
+            "status": "Aktif" if eid and nama else "Kosong",
+        })
 
-    for t in per_team.values():
-        cid = await resolve_commander_for_date(t["team"]["id"], ref)
-        cemp = (await db.table("employees").select("*").eq("id", cid).execute()).data if cid else None
-        cemp_obj = cemp[0] if cemp else None
+    for t, cid in zip(team_list, commander_eids):
+        cname = emp_names.get(cid)
+        if not cname and cid:
+            cemp = (await db.table("employees").select("nama").eq("id", cid).limit(1).execute()).data
+            cname = cemp[0]["nama"] if cemp else None
         t["commander_id"] = cid
-        t["commander_name"] = cemp_obj["nama"] if cemp_obj else None
+        t["commander_name"] = cname
 
     return {
         "date": ref,
+        "today": today_iso,
+        "latest_date": latest_date,
+        "has_attendance_today": has_attendance_today,
+        "is_fallback_to_latest": is_fallback,
         "total_employees": total_employees,
         "totals": totals,
-        "per_team": list(per_team.values()),
+        "per_team": team_list,
         "kasubid": kasubid,
     }
 
