@@ -59,13 +59,14 @@ export default function Login() {
             Sistem Informasi<br />Absensi Harian
           </h2>
           <p className="mt-4 max-w-md text-slate-300">
-            Administrasi absensi pegawai Pemadam Kebakaran berbasis regu, rekap bulanan &amp; periode,
-            serta export laporan resmi BPBD Kabupaten Mimika.
+            Merupakan sistem digital pencatatan kehadiran dan kinerja pegawai damkar,
+            dibuat oleh Fransel Manuhutu.
           </p>
         </div>
         <div className="relative flex items-center gap-2 text-sm text-slate-400">
           <ShieldCheck className="h-4 w-4" />
-          Badan Penanggulangan Bencana Daerah — Kab. Mimika
+          Badan Penanggulangan Bencana Daerah | Kab. Mimika
+          | Fransel Manuhutu 2026©
         </div>
       </div>
 
@@ -79,7 +80,7 @@ export default function Login() {
             <p className="font-heading text-lg font-extrabold">DAMKAR MIMIKA</p>
           </div>
           <h1 className="font-heading text-2xl font-bold text-slate-900">Selamat Datang</h1>
-          <p className="mt-1 text-sm text-slate-500">Masuk untuk mengelola absensi pegawai.</p>
+          <p className="mt-1 text-sm text-slate-500">di E-Kinerja Damkar Mimika 2026</p>
 
           <form onSubmit={submit} className="mt-8 space-y-4">
             <div className="space-y-1.5">
