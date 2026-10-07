@@ -447,11 +447,11 @@ export default function LaporanExport() {
                         <div className="grid grid-cols-2 gap-2">
                           <Button
                             onClick={testPush}
-                            variant="secondary"
+                            variant="outline"
                             size="sm"
-                            className="text-[11px] h-8 gap-1 font-medium"
+                            className="text-[11px] h-8 gap-1 text-slate-700"
                           >
-                            <Bell className="h-3 w-3 text-slate-700" /> Tes Push
+                            <Bell className="h-3 w-3" /> Tes Push
                           </Button>
                           <Button
                             onClick={triggerReminderAll}
