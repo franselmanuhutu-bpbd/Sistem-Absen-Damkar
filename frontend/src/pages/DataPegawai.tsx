@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { Search, Plus, Pencil, Power, History, Upload, Loader2 } from "lucide-react";
+import { Search, Plus, Pencil, Power, History, Loader2, Download } from "lucide-react";
 import { toast } from "sonner";
 import { TableSkeleton } from "@/components/ui/table-skeleton";
 
@@ -79,7 +79,7 @@ export default function DataPegawai() {
             <>
               <input ref={fileRef} type="file" accept=".xlsx,.xls" hidden onChange={doImport} data-testid="import-file" />
               <Button variant="outline" onClick={() => fileRef.current?.click()} disabled={importing} className="gap-2" data-testid="import-btn">
-                {importing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />} Import Excel
+                {importing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />} Import Excel
               </Button>
             </>
           )}
