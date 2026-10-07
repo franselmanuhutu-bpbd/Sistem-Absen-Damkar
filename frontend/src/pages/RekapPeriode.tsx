@@ -11,6 +11,7 @@ import { FileSpreadsheet, FileText, Info, Loader2, Search, X } from "lucide-reac
 import { toast } from "sonner";
 import { TableSkeleton } from "@/components/ui/table-skeleton";
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/components/ui/tooltip";
+import { Skeleton } from "@/components/ui/skeleton";
 
 function addMonths(ym: string, n: number) {
   let [y, m] = ym.split("-").map(Number);
@@ -222,16 +223,33 @@ export default function RekapPeriode() {
       </Card>
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-7">
-        <Card className="border-slate-200 bg-slate-900 p-3 text-center text-white">
-          <p className="text-2xl font-extrabold">{data?.total_pegawai ?? 0}</p>
-          <p className="text-[11px] text-slate-300">Pegawai</p>
-        </Card>
-        {STATUSES.map((s) => (
-          <Card key={s} className={`border p-3 text-center ${STATUS_CONFIG[s].badge}`}>
-            <p className="text-2xl font-extrabold">{g[s] ?? 0}</p>
-            <p className="text-[11px] font-semibold">{s}</p>
-          </Card>
-        ))}
+        {loading ? (
+          <>
+            <Card className="border-slate-200 bg-slate-900 p-3 text-center text-white">
+              <Skeleton className="mx-auto h-8 w-12 bg-slate-800" />
+              <p className="mt-1 text-[11px] text-slate-300">Pegawai</p>
+            </Card>
+            {STATUSES.map((s) => (
+              <Card key={s} className="border border-slate-200 p-3 text-center">
+                <Skeleton className="mx-auto h-8 w-10" />
+                <p className="mt-1 text-[11px] font-semibold text-slate-400">{s}</p>
+              </Card>
+            ))}
+          </>
+        ) : (
+          <>
+            <Card className="border-slate-200 bg-slate-900 p-3 text-center text-white">
+              <p className="text-2xl font-extrabold">{data?.total_pegawai ?? 0}</p>
+              <p className="text-[11px] text-slate-300">Pegawai</p>
+            </Card>
+            {STATUSES.map((s) => (
+              <Card key={s} className={`border p-3 text-center ${STATUS_CONFIG[s].badge}`}>
+                <p className="text-2xl font-extrabold">{g[s] ?? 0}</p>
+                <p className="text-[11px] font-semibold">{s}</p>
+              </Card>
+            ))}
+          </>
+        )}
       </div>
 
       <Tabs defaultValue="total">

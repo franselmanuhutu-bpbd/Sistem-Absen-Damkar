@@ -35,6 +35,26 @@ const server = serve({
       });
     },
 
+    // Favicon
+    "/favicon.svg": async () => {
+      const file = Bun.file("public/favicon.svg");
+      if (await file.exists()) {
+        return new Response(file, {
+          headers: { "Content-Type": "image/svg+xml", "Cache-Control": "public, max-age=86400" },
+        });
+      }
+      return new Response(null, { status: 404 });
+    },
+    "/favicon.ico": async () => {
+      const file = Bun.file("public/favicon.svg");
+      if (await file.exists()) {
+        return new Response(file, {
+          headers: { "Content-Type": "image/svg+xml", "Cache-Control": "public, max-age=86400" },
+        });
+      }
+      return new Response(null, { status: 404 });
+    },
+
     // SPA fallback: serve index.html for all other routes
     "/*": index,
   },

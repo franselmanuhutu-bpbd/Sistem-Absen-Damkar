@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Flame, ShieldCheck, Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import { motion } from "framer-motion";
 
 export default function Login() {
   const { user, login } = useAuth();
@@ -72,7 +73,12 @@ export default function Login() {
 
       {/* Right form */}
       <div className="flex w-full items-center justify-center bg-slate-50 p-6 lg:w-1/2">
-        <div className="w-full max-w-sm">
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, ease: "easeOut" }}
+          className="w-full max-w-sm"
+        >
           <div className="mb-8 lg:hidden flex items-center gap-3">
             <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-red-600 text-white">
               <Flame className="h-6 w-6" />
@@ -118,7 +124,7 @@ export default function Login() {
               {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : "Masuk"}
             </Button>
           </form>
-        </div>
+        </motion.div>
       </div>
     </div>
   );

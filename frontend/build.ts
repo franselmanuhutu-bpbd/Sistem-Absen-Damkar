@@ -28,11 +28,14 @@ if (!result.success) {
 }
 
 // Copy public files if present
-const publicSw = path.join(process.cwd(), "public", "sw.js");
-const distSw = path.join(outdir, "sw.js");
-if (await Bun.file(publicSw).exists()) {
-  await Bun.write(distSw, Bun.file(publicSw));
-  console.log("  Copied public/sw.js to dist/sw.js");
+const publicDir = path.join(process.cwd(), "public");
+for (const filename of ["sw.js", "favicon.svg"]) {
+  const src = path.join(publicDir, filename);
+  const dest = path.join(outdir, filename);
+  if (await Bun.file(src).exists()) {
+    await Bun.write(dest, Bun.file(src));
+    console.log(`  Copied public/${filename} to dist/${filename}`);
+  }
 }
 
 console.log("Build successful:");

@@ -9,17 +9,36 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Skeleton } from "@/components/ui/skeleton";
 import { UserPlus, Pencil, Power } from "lucide-react";
 import { toast } from "sonner";
+import { motion } from "framer-motion";
 
 export default function UserManagement() {
   const { user } = useAuth();
-  const [users, setUsers] = useState([]);
-  const [employees, setEmployees] = useState([]);
-  const [form, setForm] = useState(null);
+  const [users, setUsers] = useState<any[]>([]);
+  const [employees, setEmployees] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [form, setForm] = useState<any>(null);
 
-  const load = () => api.get("/users").then((r) => setUsers(r.data));
-  useEffect(() => { load(); api.get("/employees", { params: { status: "ACTIVE" } }).then((r) => setEmployees(r.data)); }, []);
+  const load = async () => {
+    setLoading(true);
+    try {
+      const r = await api.get("/users");
+      setUsers(r.data || []);
+    } catch (e) {
+      toast.error(apiError(e));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    load();
+    api.get("/employees", { params: { status: "ACTIVE" } })
+      .then((r) => setEmployees(r.data || []))
+      .catch(() => {});
+  }, []);
 
   const save = async () => {
     try {
@@ -42,42 +61,77 @@ export default function UserManagement() {
       <div className="flex items-center justify-between">
         <div>
           <h2 className="font-heading text-2xl font-bold text-slate-900">Manajemen User &amp; Role</h2>
-          <p className="text-sm text-slate-500">{users.length} user terdaftar</p>
+          {loading ? (
+            <Skeleton className="h-4 w-28 mt-1" />
+          ) : (
+            <p className="text-sm text-slate-500">{users.length} user terdaftar</p>
+          )}
         </div>
         <Button onClick={() => setForm({ name: "", email: "", password: "", role: "operator", status: "ACTIVE", employee_id: "" })} className="gap-2 bg-red-600 hover:bg-red-700" data-testid="add-user-btn">
           <UserPlus className="h-4 w-4" /> Tambah User
         </Button>
       </div>
 
-      <Card className="overflow-hidden border-slate-200">
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b bg-slate-50 text-left text-xs uppercase text-slate-500">
-                <th className="px-4 py-3">Nama</th><th className="px-4 py-3">Email</th>
-                <th className="px-4 py-3">Role</th><th className="px-4 py-3">Status</th>
-                <th className="px-4 py-3 text-right">Aksi</th>
-              </tr>
-            </thead>
-            <tbody>
-              {users.map((u) => (
-                <tr key={u.id} className="border-b border-slate-100 hover:bg-slate-50" data-testid={`user-row-${u.id}`}>
-                  <td className="px-4 py-3 font-semibold text-slate-800">{u.name}</td>
-                  <td className="px-4 py-3 text-slate-500">{u.email}</td>
-                  <td className="px-4 py-3"><Badge className={`${roleBadge[u.role]} hover:${roleBadge[u.role]}`}>{ROLE_LABEL[u.role]}</Badge></td>
-                  <td className="px-4 py-3"><Badge className={u.status === "ACTIVE" ? "bg-emerald-100 text-emerald-700" : "bg-slate-200 text-slate-600"}>{u.status === "ACTIVE" ? "Aktif" : "Nonaktif"}</Badge></td>
-                  <td className="px-4 py-3">
-                    <div className="flex justify-end gap-1">
-                      <Button size="icon" variant="ghost" onClick={() => setForm({ ...u, password: "", employee_id: u.employee_id || "" })} data-testid={`edit-user-${u.id}`}><Pencil className="h-4 w-4 text-slate-500" /></Button>
-                      {Boolean(user && u.id !== user.id) && <Button size="icon" variant="ghost" onClick={() => deactivate(u)} data-testid={`deactivate-user-${u.id}`}><Power className="h-4 w-4 text-rose-500" /></Button>}
-                    </div>
-                  </td>
+      <motion.div
+        initial={{ opacity: 0, y: 8 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5, ease: "easeOut" }}
+      >
+        <Card className="overflow-hidden border-slate-200">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b bg-slate-50 text-left text-xs uppercase text-slate-500">
+                  <th className="px-4 py-3">Nama</th>
+                  <th className="px-4 py-3">Email</th>
+                  <th className="px-4 py-3">Role</th>
+                  <th className="px-4 py-3">Status</th>
+                  <th className="px-4 py-3 text-right">Aksi</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </Card>
+              </thead>
+              <tbody>
+                {loading ? (
+                  Array.from({ length: 6 }).map((_, i) => (
+                    <tr key={i} className="border-b border-slate-100">
+                      <td className="px-4 py-3"><Skeleton className="h-4 w-32" /></td>
+                      <td className="px-4 py-3"><Skeleton className="h-4 w-40" /></td>
+                      <td className="px-4 py-3"><Skeleton className="h-5 w-20 rounded-full" /></td>
+                      <td className="px-4 py-3"><Skeleton className="h-5 w-16 rounded-full" /></td>
+                      <td className="px-4 py-3 text-right">
+                        <div className="flex justify-end gap-1">
+                          <Skeleton className="h-8 w-8 rounded-md" />
+                          <Skeleton className="h-8 w-8 rounded-md" />
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                ) : users.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="py-12 text-center text-slate-400">
+                      Belum ada user terdaftar.
+                    </td>
+                  </tr>
+                ) : (
+                  users.map((u) => (
+                    <tr key={u.id} className="border-b border-slate-100 hover:bg-slate-50 transition-colors" data-testid={`user-row-${u.id}`}>
+                      <td className="px-4 py-3 font-semibold text-slate-800">{u.name}</td>
+                      <td className="px-4 py-3 text-slate-500">{u.email}</td>
+                      <td className="px-4 py-3"><Badge className={`${roleBadge[u.role]} hover:${roleBadge[u.role]}`}>{ROLE_LABEL[u.role]}</Badge></td>
+                      <td className="px-4 py-3"><Badge className={u.status === "ACTIVE" ? "bg-emerald-100 text-emerald-700" : "bg-slate-200 text-slate-600"}>{u.status === "ACTIVE" ? "Aktif" : "Nonaktif"}</Badge></td>
+                      <td className="px-4 py-3">
+                        <div className="flex justify-end gap-1">
+                          <Button size="icon" variant="ghost" onClick={() => setForm({ ...u, password: "", employee_id: u.employee_id || "" })} data-testid={`edit-user-${u.id}`}><Pencil className="h-4 w-4 text-slate-500" /></Button>
+                          {Boolean(user && u.id !== user.id) && <Button size="icon" variant="ghost" onClick={() => deactivate(u)} data-testid={`deactivate-user-${u.id}`}><Power className="h-4 w-4 text-rose-500" /></Button>}
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </Card>
+      </motion.div>
 
       <Dialog open={!!form} onOpenChange={(o) => !o && setForm(null)}>
         <DialogContent>

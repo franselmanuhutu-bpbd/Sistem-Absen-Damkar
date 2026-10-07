@@ -6,22 +6,41 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Star, UserPlus, UserMinus, History, Search, X } from "lucide-react";
 import { toast } from "sonner";
 import { EmployeeSearchSelect } from "@/components/EmployeeSearchSelect";
+import { motion } from "framer-motion";
 
 const today = new Date().toISOString().slice(0, 10);
 
 export default function PengaturanKasubid() {
   const [positions, setPositions] = useState<any[]>([]);
   const [employees, setEmployees] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [setForm, setSetForm] = useState<any>(null);
   const [vacForm, setVacForm] = useState<any>(null);
   const [histPos, setHistPos] = useState<any>(null);
 
-  const load = () => api.get("/kasubid").then((r) => setPositions(r.data));
-  useEffect(() => { load(); api.get("/employees", { params: { status: "ACTIVE" } }).then((r) => setEmployees(r.data)); }, []);
+  const load = async () => {
+    setLoading(true);
+    try {
+      const r = await api.get("/kasubid");
+      setPositions(r.data || []);
+    } catch (e) {
+      toast.error(apiError(e));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    load();
+    api.get("/employees", { params: { status: "ACTIVE" } })
+      .then((r) => setEmployees(r.data || []))
+      .catch(() => {});
+  }, []);
 
   const submitSet = async () => {
     try {
@@ -78,38 +97,71 @@ export default function PengaturanKasubid() {
       </div>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        {filteredPositions.map((p: any) => (
-          <Card key={p.position_id} className="border-slate-200 p-5" data-testid={`pk-card-${p.position_id}`}>
-            <div className="flex items-start justify-between">
-              <div className="flex items-center gap-3">
-                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-amber-100 text-amber-600"><Star className="h-6 w-6" /></div>
-                <div>
-                  <p className="text-xs font-bold uppercase text-slate-400">{p.label}</p>
-                  <p className="font-heading text-lg font-bold text-slate-900">{p.nama || "Belum Diisi / Kosong"}</p>
-                  {p.jabatan && <p className="text-xs text-slate-400">{p.jabatan}</p>}
+        {loading ? (
+          Array.from({ length: 4 }).map((_, i) => (
+            <Card key={i} className="border-slate-200 p-5">
+              <div className="flex items-start justify-between">
+                <div className="flex items-center gap-3">
+                  <Skeleton className="h-12 w-12 rounded-xl" />
+                  <div className="space-y-2">
+                    <Skeleton className="h-3 w-28" />
+                    <Skeleton className="h-5 w-44" />
+                    <Skeleton className="h-3 w-32" />
+                  </div>
                 </div>
+                <Skeleton className="h-5 w-16 rounded-full" />
               </div>
-              <Badge className={`${statusColor(p.status)} hover:${statusColor(p.status)}`}>{p.status}</Badge>
-            </div>
-            <div className="mt-4 flex flex-wrap gap-2">
-              <Button size="sm" onClick={() => setSetForm({ position_id: p.position_id, employee_id: "", start_date: today, label: p.label })} className="gap-1.5 bg-red-600 hover:bg-red-700" data-testid={`pk-set-${p.position_id}`}>
-                <UserPlus className="h-4 w-4" /> {p.status === "Aktif" ? "Ganti Pejabat" : "Tetapkan Pejabat"}
-              </Button>
-              {p.status === "Aktif" && (
-                <Button size="sm" variant="outline" onClick={() => setVacForm({ position_id: p.position_id, start_date: today, label: p.label })} className="gap-1.5" data-testid={`pk-vacate-${p.position_id}`}>
-                  <UserMinus className="h-4 w-4" /> Kosongkan
-                </Button>
-              )}
-              <Button size="sm" variant="ghost" onClick={() => setHistPos(p)} className="gap-1.5" data-testid={`pk-hist-${p.position_id}`}>
-                <History className="h-4 w-4" /> Riwayat
-              </Button>
-            </div>
-          </Card>
-        ))}
-        {filteredPositions.length === 0 && (
+              <div className="mt-4 flex flex-wrap gap-2">
+                <Skeleton className="h-8 w-32 rounded-md" />
+                <Skeleton className="h-8 w-24 rounded-md" />
+                <Skeleton className="h-8 w-20 rounded-md" />
+              </div>
+            </Card>
+          ))
+        ) : filteredPositions.length === 0 ? (
           <div className="col-span-full py-12 text-center text-slate-400">
-            Tidak ada jabatan atau pejabat Kasubid yang sesuai dengan "{search}".
+            {search ? `Tidak ada jabatan atau pejabat Kasubid yang sesuai dengan "${search}".` : "Belum ada jabatan Kasubid."}
           </div>
+        ) : (
+          filteredPositions.map((p: any) => (
+            <motion.div
+              key={p.position_id}
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, ease: "easeOut" }}
+            >
+              <Card className="border-slate-200 p-5 h-full flex flex-col justify-between" data-testid={`pk-card-${p.position_id}`}>
+                <div>
+                  <div className="flex items-start justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-amber-100 text-amber-600 shrink-0">
+                        <Star className="h-6 w-6" />
+                      </div>
+                      <div>
+                        <p className="text-xs font-bold uppercase text-slate-400">{p.label}</p>
+                        <p className="font-heading text-lg font-bold text-slate-900">{p.nama || "Belum Diisi / Kosong"}</p>
+                        {p.jabatan && <p className="text-xs text-slate-400">{p.jabatan}</p>}
+                      </div>
+                    </div>
+                    <Badge className={`${statusColor(p.status)} hover:${statusColor(p.status)}`}>{p.status}</Badge>
+                  </div>
+                </div>
+                <div className="mt-4 flex flex-wrap gap-2 pt-2 border-t border-slate-100">
+                  <Button size="sm" onClick={() => setSetForm({ position_id: p.position_id, employee_id: "", start_date: today, label: p.label })} className="gap-1.5 bg-red-600 hover:bg-red-700" data-testid={`pk-set-${p.position_id}`}>
+                    <UserPlus className="h-4 w-4" /> {p.status === "Aktif" ? "Ganti Pejabat" : "Tetapkan Pejabat"}
+                  </Button>
+                  {p.status === "Aktif" && (
+                    <Button size="sm" variant="outline" onClick={() => setVacForm({ position_id: p.position_id, start_date: today, label: p.label })} className="gap-1.5" data-testid={`pk-vacate-${p.position_id}`}>
+                      <UserMinus className="h-4 w-4" /> Kosongkan
+                    </Button>
+                  )}
+                  <Button size="sm" variant="ghost" onClick={() => setHistPos(p)} className="gap-1.5" data-testid={`pk-hist-${p.position_id}`}>
+                    <History className="h-4 w-4" /> Riwayat
+                  </Button>
+                </div>
+              </Card>
+            </motion.div>
+          ))
         )}
       </div>
 
