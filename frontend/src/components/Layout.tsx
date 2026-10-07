@@ -8,6 +8,7 @@ import {
   UserCircle, Star, Settings, type LucideIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { NetworkStatusBadge } from "./NetworkStatusBadge";
 
 type NavItem =
   | {
@@ -143,10 +144,7 @@ export function Layout({ children }: { children: ReactNode }) {
               BPBD Kab. Mimika — Bidang Pemadam Kebakaran
             </p>
           </div>
-          <div className="ml-auto hidden items-center gap-2 rounded-full bg-slate-100 px-3 py-1.5 sm:flex">
-            <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-            <span className="text-xs font-medium text-slate-600">Online</span>
-          </div>
+          <NetworkStatusBadge />
         </header>
         <main className="p-4 lg:p-8 animate-fade-up">{children}</main>
       </div>

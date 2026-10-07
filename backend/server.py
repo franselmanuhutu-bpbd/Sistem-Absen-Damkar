@@ -54,6 +54,29 @@ async def api_root():
     return {"message": "DAMKAR Absensi API (Supabase PostgreSQL)"}
 
 
+@api.get("/health")
+async def health_check():
+    """Lightweight health & database check with latency measurement."""
+    from time import perf_counter
+    from database import get_db
+
+    db_status = "connected"
+    t0 = perf_counter()
+    try:
+        db = await get_db()
+        await db.table("teams").select("id").limit(1).execute()
+        latency_ms = round((perf_counter() - t0) * 1000, 1)
+    except Exception as e:
+        db_status = "error"
+        latency_ms = round((perf_counter() - t0) * 1000, 1)
+
+    return {
+        "status": "ok" if db_status == "connected" else "degraded",
+        "database": db_status,
+        "latency_ms": latency_ms,
+    }
+
+
 # Include all modular routers
 api.include_router(auth.router)
 api.include_router(users.router)
