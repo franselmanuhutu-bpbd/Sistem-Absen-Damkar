@@ -9,16 +9,18 @@ import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
-import { ArrowRightLeft, Flame, Star, Loader2, Pencil, Crown, History, RotateCcw, Search, X } from "lucide-react";
+import { ArrowRightLeft, Flame, Star, Loader2, Pencil, Crown, History, RotateCcw, Search, X, Calendar } from "lucide-react";
 import { toast } from "sonner";
 import { TableSkeleton } from "@/components/ui/table-skeleton";
 import { EmployeeSearchSelect } from "@/components/EmployeeSearchSelect";
 import { cn } from "@/lib/utils";
+import { formatDateId } from "@/lib/constants";
 
 const today = new Date().toISOString().slice(0, 10);
 
 export default function ManajemenRegu() {
   const { user } = useAuth();
+  const [selectedDate, setSelectedDate] = useState(today);
   const [teams, setTeams] = useState<any[]>([]);
   const [activeTeam, setActiveTeam] = useState("");
   const [detail, setDetail] = useState<any>(null);
@@ -43,15 +45,17 @@ export default function ManajemenRegu() {
   const isAdmin = Boolean(user && user.role === "admin");
 
   const loadTeams = () => api.get("/teams").then((r) => { setTeams(r.data); if (!activeTeam && r.data[0]) setActiveTeam(r.data[0].id); });
-  const loadEmp = () => api.get("/employees", { params: { status: "ACTIVE" } }).then((r) => setAllEmp(r.data));
-  const loadKasubid = () => api.get("/kasubid").then((r) => setKasubid(r.data));
-  useEffect(() => { loadTeams(); loadEmp(); loadKasubid(); }, []);
+  const loadEmp = (d = selectedDate) => api.get("/employees", { params: { status: "ACTIVE", date: d } }).then((r) => setAllEmp(r.data));
+  const loadKasubid = (d = selectedDate) => api.get("/kasubid", { params: { date: d } }).then((r) => setKasubid(r.data));
+  useEffect(() => { loadTeams(); }, []);
+  useEffect(() => { loadEmp(selectedDate); loadKasubid(selectedDate); }, [selectedDate]);
 
-  const loadDetail = (tid) => {
+  const loadDetail = (tid = activeTeam, d = selectedDate) => {
+    if (!tid) return;
     setLoading(true);
-    api.get(`/teams/${tid}/detail`, { params: { date: today } }).then((r) => setDetail(r.data)).finally(() => setLoading(false));
+    api.get(`/teams/${tid}/detail`, { params: { date: d } }).then((r) => setDetail(r.data)).finally(() => setLoading(false));
   };
-  useEffect(() => { if (activeTeam) loadDetail(activeTeam); }, [activeTeam]);
+  useEffect(() => { if (activeTeam) loadDetail(activeTeam, selectedDate); }, [activeTeam, selectedDate]);
 
   const submitRoll = async () => {
     if (!roll?.employee_ids?.length || !roll?.team_id) {
@@ -69,8 +73,8 @@ export default function ManajemenRegu() {
       const count = res.data?.count ?? roll.employee_ids.length;
       toast.success(`${count} penempatan regu berhasil disimpan`);
       setRoll(null);
-      loadDetail(activeTeam);
-      loadEmp();
+      loadDetail(activeTeam, selectedDate);
+      loadEmp(selectedDate);
     } catch (e) {
       toast.error(apiError(e));
     } finally {
@@ -139,28 +143,28 @@ export default function ManajemenRegu() {
     setRoll({
       employee_ids: employeeIds,
       team_id: teamId,
-      start_date: today,
+      start_date: selectedDate,
     });
   };
   const submitRename = async () => {
     try {
       await api.put(`/teams/${rename.id}/rename`, { name: rename.name });
       toast.success("Nama regu diperbarui");
-      setRename(null); loadTeams(); loadDetail(activeTeam);
+      setRename(null); loadTeams(); loadDetail(activeTeam, selectedDate);
     } catch (e) { toast.error(apiError(e)); }
   };
   const submitCmd = async () => {
     try {
       await api.post("/commanders", { team_id: activeTeam, employee_id: cmd.employee_id, start_date: cmd.start_date });
       toast.success("Komandan Regu ditetapkan");
-      setCmd(null); loadDetail(activeTeam);
+      setCmd(null); loadDetail(activeTeam, selectedDate);
     } catch (e) { toast.error(apiError(e)); }
   };
   const submitKasubid = async () => {
     try {
       await api.post("/kasubid", { position_id: ksForm.position_id, employee_id: ksForm.employee_id, start_date: ksForm.start_date });
       toast.success("Kasubid ditetapkan");
-      setKsForm(null); loadKasubid();
+      setKsForm(null); loadKasubid(selectedDate);
     } catch (e) { toast.error(apiError(e)); }
   };
   const openHist = () => {
@@ -172,7 +176,7 @@ export default function ManajemenRegu() {
       const { data } = await api.post("/assignments/reset");
       toast.success(`${data.deleted} penempatan dihapus. Semua regu kini kosong — silakan tata ulang anggota satu per satu.`);
       setResetOpen(false);
-      loadDetail(activeTeam); loadEmp();
+      loadDetail(activeTeam, selectedDate); loadEmp(selectedDate);
     } catch (e) { toast.error(apiError(e)); }
   };
 
@@ -193,12 +197,43 @@ export default function ManajemenRegu() {
           <h2 className="font-heading text-2xl font-bold text-slate-900">Struktur Organisasi &amp; Rolling</h2>
           <p className="text-sm text-slate-500">Kelola Kasubid, 6 regu, Komandan Regu, dan rolling pegawai berbasis periode.</p>
         </div>
-        {isAdmin && (
-          <Button variant="outline" onClick={() => setResetOpen(true)} data-testid="reset-assignments-btn" className="gap-2 border-rose-200 text-rose-600 hover:bg-rose-50">
-            <RotateCcw className="h-4 w-4" /> Reset Penempatan Regu
-          </Button>
-        )}
+        <div className="flex flex-wrap items-center gap-2.5">
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-semibold text-slate-600">Tanggal Acuan</span>
+            <Input
+              type="date"
+              data-testid="manajemen-regu-date"
+              value={selectedDate}
+              onChange={(e) => setSelectedDate(e.target.value)}
+              className="h-9 w-40 bg-white cursor-pointer text-xs"
+            />
+          </div>
+          {isAdmin && (
+            <Button variant="outline" size="sm" onClick={() => setResetOpen(true)} data-testid="reset-assignments-btn" className="h-9 gap-2 border-rose-200 text-rose-600 hover:bg-rose-50 text-xs">
+              <RotateCcw className="h-3.5 w-3.5" /> Reset Penempatan Regu
+            </Button>
+          )}
+        </div>
       </div>
+
+      {selectedDate !== today && (
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between rounded-xl border border-sky-200 bg-sky-50/80 p-3 text-sky-950 text-xs shadow-sm">
+          <div className="flex items-center gap-2">
+            <Calendar className="h-4 w-4 shrink-0 text-sky-600" />
+            <span>
+              Menampilkan struktur regu &amp; penempatan pada tanggal <b>{formatDateId(selectedDate)}</b>. Rolling / penempatan baru akan otomatis berlaku mulai tanggal ini.
+            </span>
+          </div>
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-7 text-xs border-sky-300 bg-white hover:bg-sky-100 text-sky-900 self-start sm:self-auto shrink-0"
+            onClick={() => setSelectedDate(today)}
+          >
+            Kembali ke Hari Ini
+          </Button>
+        </div>
+      )}
 
       <Dialog open={resetOpen} onOpenChange={setResetOpen}>
         <DialogContent>
@@ -226,7 +261,7 @@ export default function ManajemenRegu() {
               </div>
             </div>
             {isAdmin && (
-              <Button size="sm" variant="outline" onClick={() => setKsForm({ position_id: k.position_id, employee_id: "", start_date: today, label: k.label })} data-testid={`ks-set-${k.position_id}`}>
+              <Button size="sm" variant="outline" onClick={() => setKsForm({ position_id: k.position_id, employee_id: "", start_date: selectedDate, label: k.label })} data-testid={`ks-set-${k.position_id}`}>
                 Ganti
               </Button>
             )}
@@ -277,7 +312,7 @@ export default function ManajemenRegu() {
             <Badge className="gap-1.5 bg-amber-100 text-amber-700 hover:bg-amber-100">
               <Crown className="h-3.5 w-3.5" /> Komandan: {detail?.commander?.nama || "—"}
             </Badge>
-            <Button size="sm" variant="outline" onClick={() => setCmd({ employee_id: "", start_date: today })} data-testid="set-commander-btn">
+            <Button size="sm" variant="outline" onClick={() => setCmd({ employee_id: "", start_date: selectedDate })} data-testid="set-commander-btn">
               <Crown className="mr-1.5 h-4 w-4" /> Komandan
             </Button>
             <Button size="sm" variant="outline" onClick={openHist} data-testid="team-history-btn">

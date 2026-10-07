@@ -79,9 +79,10 @@ async def dashboard(date: str = None, user: dict = Depends(get_current_user)):
 
     totals = empty()
     per_team = {t["id"]: {"team": t, "members": 0, **empty()} for t in teams}
+    has_att = len(rec_team_map) > 0
     for e in active_emps:
         eid = e["id"]
-        tid = team_map.get(eid) or rec_team_map.get(eid) or today_team_map.get(eid)
+        tid = (rec_team_map.get(eid) if has_att else None) or team_map.get(eid) or today_team_map.get(eid)
         if tid in per_team:
             per_team[tid]["members"] += 1
 
@@ -162,9 +163,12 @@ async def org_structure(date: str = None, user: dict = Depends(get_current_user)
     team_map = await resolve_teams_for_date(ref)
     today_team_map = await resolve_teams_for_date(_date.today().isoformat()) if ref != _date.today().isoformat() else team_map
     emps = {e["id"]: e for e in ((await db.table("employees").select("*").eq("status", "ACTIVE").limit(5000).execute()).data or [])}
+    records = (await db.table("attendance").select("employee_id, team_id").eq("date", ref).limit(10000).execute()).data or []
+    rec_team_map = {r["employee_id"]: r["team_id"] for r in records if r.get("team_id") and r.get("employee_id") in emps}
+    has_att = len(rec_team_map) > 0
     counts = {}
     for eid in emps:
-        tid = team_map.get(eid) or today_team_map.get(eid)
+        tid = (rec_team_map.get(eid) if has_att else None) or team_map.get(eid) or today_team_map.get(eid)
         if tid:
             counts[tid] = counts.get(tid, 0) + 1
     kasubid = []

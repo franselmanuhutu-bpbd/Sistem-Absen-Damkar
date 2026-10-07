@@ -90,11 +90,31 @@ async def team_detail(team_id: str, date: str = None, user: dict = Depends(get_c
         raise HTTPException(status_code=404, detail="Regu tidak ditemukan")
     team = team_res.data[0]
     team_map = await resolve_teams_for_date(ref)
-    ids = [eid for eid, tid in team_map.items() if tid == team_id]
+    today_team_map = (
+        await resolve_teams_for_date(_date.today().isoformat())
+        if ref != _date.today().isoformat()
+        else team_map
+    )
+
+    att_res = await db.table("attendance").select("employee_id, team_id").eq("date", ref).eq("team_id", team_id).execute()
+    att_eids = {r["employee_id"] for r in (att_res.data or []) if r.get("employee_id")}
+
+    assigned_eids = {eid for eid, tid in team_map.items() if tid == team_id}
+    today_eids = {eid for eid, tid in today_team_map.items() if tid == team_id}
+    if att_eids:
+        target_ids = att_eids
+    elif assigned_eids:
+        target_ids = assigned_eids
+    else:
+        target_ids = today_eids
+    ids = list(target_ids)
+
     members = []
     if ids:
         members = (await db.table("employees").select("*").in_("id", ids).eq("status", "ACTIVE").order("no").limit(5000).execute()).data or []
     cid = await resolve_commander_for_date(team_id, ref)
+    if not cid and ref != _date.today().isoformat():
+        cid = await resolve_commander_for_date(team_id, _date.today().isoformat())
     cemp = (await db.table("employees").select("*").eq("id", cid).execute()).data if cid else None
     cemp_obj = cemp[0] if cemp else None
     for m in members:

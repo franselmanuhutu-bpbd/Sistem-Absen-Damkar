@@ -159,7 +159,9 @@ export default function InputAbsensi() {
                     </td>
                     <td className="px-2 py-3 text-slate-400">{e.no}</td>
                     <td className="px-3 py-3">
-                      <p className="font-semibold text-slate-800">{e.nama}</p>
+                      <p className="font-semibold text-slate-800">
+                        {e.nama} {e.is_commander && <span title="Komandan Regu">⭐</span>}
+                      </p>
                       <p className="text-xs text-slate-400 md:hidden">{e.nip}</p>
                     </td>
                     <td className="hidden px-3 py-3 font-mono text-xs text-slate-500 md:table-cell">{e.nip}</td>

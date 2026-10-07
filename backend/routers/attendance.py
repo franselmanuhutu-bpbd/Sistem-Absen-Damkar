@@ -1,4 +1,5 @@
 from fastapi import APIRouter, HTTPException, Depends
+from datetime import date as _date
 from typing import Optional
 import uuid
 
@@ -6,7 +7,7 @@ from config import STATUSES
 from database import get_db
 from models import BatchAttendanceIn
 from auth import get_current_user, require_roles
-from utils import now_iso, write_audit, resolve_teams_for_date
+from utils import now_iso, write_audit, resolve_teams_for_date, resolve_commander_for_date
 
 router = APIRouter(tags=["Attendance"])
 
@@ -15,17 +16,39 @@ router = APIRouter(tags=["Attendance"])
 async def attendance_roster(date: str, team_id: str, user: dict = Depends(get_current_user)):
     db = await get_db()
     team_map = await resolve_teams_for_date(date)
-    ids = [eid for eid, tid in team_map.items() if tid == team_id]
-    if not ids:
-        return []
-    emps_res = await db.table("employees").select("*").in_("id", ids).eq("status", "ACTIVE").order("no").execute()
-    emps = emps_res.data or []
+    today_team_map = (
+        await resolve_teams_for_date(_date.today().isoformat())
+        if date != _date.today().isoformat()
+        else team_map
+    )
 
-    rec_res = await db.table("attendance").select("*").eq("date", date).in_("employee_id", ids).execute()
+    rec_res = await db.table("attendance").select("*").eq("date", date).execute()
     records = rec_res.data or []
     status_map = {r["employee_id"]: r["status"] for r in records}
+    att_team_eids = {r["employee_id"] for r in records if r.get("team_id") == team_id}
+
+    assigned_eids = {eid for eid, tid in team_map.items() if tid == team_id}
+    today_eids = {eid for eid, tid in today_team_map.items() if tid == team_id}
+
+    if att_team_eids:
+        target_ids = att_team_eids
+    elif assigned_eids:
+        target_ids = assigned_eids
+    else:
+        target_ids = today_eids
+
+    if not target_ids:
+        return []
+
+    emps_res = await db.table("employees").select("*").in_("id", list(target_ids)).eq("status", "ACTIVE").order("no").execute()
+    emps = emps_res.data or []
+    cid = await resolve_commander_for_date(team_id, date)
+    if not cid and date != _date.today().isoformat():
+        cid = await resolve_commander_for_date(team_id, _date.today().isoformat())
+
     for e in emps:
         e["status"] = status_map.get(e["id"])
+        e["is_commander"] = bool(cid and e["id"] == cid)
     return emps
 
 
@@ -35,6 +58,11 @@ async def batch_attendance(body: BatchAttendanceIn, user: dict = Depends(require
         raise HTTPException(status_code=400, detail="Status tidak valid")
     db = await get_db()
     team_map = await resolve_teams_for_date(body.date)
+    today_team_map = (
+        await resolve_teams_for_date(_date.today().isoformat())
+        if body.date != _date.today().isoformat()
+        else team_map
+    )
     count = 0
     for eid in body.employee_ids:
         existing_res = await db.table("attendance").select("*").eq("employee_id", eid).eq("date", body.date).execute()
@@ -42,11 +70,12 @@ async def batch_attendance(body: BatchAttendanceIn, user: dict = Depends(require
         old = existing["status"] if existing else None
         if old == body.status:
             continue
+        effective_team_id = team_map.get(eid) or (existing.get("team_id") if existing else None) or today_team_map.get(eid)
         doc = {
             "employee_id": eid,
             "date": body.date,
             "status": body.status,
-            "team_id": team_map.get(eid),
+            "team_id": effective_team_id,
             "updated_at": now_iso(),
             "updated_by": user["email"],
         }
