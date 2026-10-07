@@ -7,9 +7,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { FileSpreadsheet, FileText, Loader2, Search, X } from "lucide-react";
+import { FileSpreadsheet, FileText, Info, Loader2, Search, X } from "lucide-react";
 import { toast } from "sonner";
 import { TableSkeleton } from "@/components/ui/table-skeleton";
+import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/components/ui/tooltip";
 
 function addMonths(ym: string, n: number) {
   let [y, m] = ym.split("-").map(Number);
@@ -18,6 +19,23 @@ function addMonths(ym: string, n: number) {
   while (m < 1) { m += 12; y -= 1; }
   return `${y}-${String(m).padStart(2, "0")}`;
 }
+
+function getDaysInPeriod(startYm: string, endYm: string) {
+  if (!startYm || !endYm) return 0;
+  let [sy, sm] = startYm.split("-").map(Number);
+  const [ey, em] = endYm.split("-").map(Number);
+  let total = 0;
+  while (sy < ey || (sy === ey && sm <= em)) {
+    total += new Date(sy, sm, 0).getDate();
+    sm++;
+    if (sm > 12) {
+      sm = 1;
+      sy++;
+    }
+  }
+  return total;
+}
+
 const curMonth = new Date().toISOString().slice(0, 7);
 const QUICK = [{ k: 1, l: "1 Bulan" }, { k: 3, l: "3 Bulan" }, { k: 6, l: "6 Bulan" }, { k: 12, l: "12 Bulan" }, { k: 0, l: "Custom" }];
 
@@ -32,6 +50,8 @@ export default function RekapPeriode() {
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [exp, setExp] = useState("");
+
+  const totalPeriodDays = getDaysInPeriod(start, end);
 
   useEffect(() => { api.get("/teams").then((r) => setTeams(r.data)); }, []);
 
@@ -234,7 +254,34 @@ export default function RekapPeriode() {
                       <th className="px-3 py-3">Regu</th>
                       <th className="px-3 py-3">Kategori</th>
                       {STATUSES.map((s) => <th key={s} className="px-2 py-3 text-center">{s}</th>)}
-                      <th className="px-3 py-3 text-center">Jumlah Hari Kerja</th>
+                      <th className="px-3 py-3 text-center">
+                        <div className="inline-flex items-center justify-center gap-1.5">
+                          <span>Jumlah Hari Kerja</span>
+                          <TooltipProvider delayDuration={150}>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <span className="inline-flex cursor-pointer items-center text-blue-500 hover:text-blue-700 transition-colors p-0.5 rounded-full hover:bg-blue-50">
+                                  <Info className="h-3.5 w-3.5 shrink-0" />
+                                </span>
+                              </TooltipTrigger>
+                              <TooltipContent side="top" className="max-w-xs p-3 text-center shadow-xl">
+                                <div className="space-y-1">
+                                  <p className="font-bold text-white text-xs">
+                                    Total Hari Periode ({data?.period_label || `${monthLabel(start)} – ${monthLabel(end)}`}):{" "}
+                                    <span className="text-emerald-400">{totalPeriodDays} Hari</span>
+                                  </p>
+                                  <p className="text-[11px] text-slate-200">
+                                    Rumus: <span className="font-mono font-bold text-amber-300">{totalPeriodDays} − Status OFF</span>
+                                  </p>
+                                  <p className="text-[11px] text-slate-400 border-t border-slate-700/80 pt-1 mt-1">
+                                    Akumulasi hari kalender periode ({totalPeriodDays} hari) dikurangi akumulasi status OFF per pegawai.
+                                  </p>
+                                </div>
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        </div>
+                      </th>
                       <th className="px-3 py-3 text-center">Total Kehadiran</th>
                     </tr>
                   </thead>
@@ -289,7 +336,33 @@ export default function RekapPeriode() {
                       <th className="px-3 py-3">Regu</th>
                       <th className="px-3 py-3">Bulan</th>
                       {STATUSES.map((s) => <th key={s} className="px-2 py-3 text-center">{s}</th>)}
-                      <th className="px-3 py-3 text-center">Jumlah Hari Kerja</th>
+                      <th className="px-3 py-3 text-center">
+                        <div className="inline-flex items-center justify-center gap-1.5">
+                          <span>Jumlah Hari Kerja</span>
+                          <TooltipProvider delayDuration={150}>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <span className="inline-flex cursor-pointer items-center text-blue-500 hover:text-blue-700 transition-colors p-0.5 rounded-full hover:bg-blue-50">
+                                  <Info className="h-3.5 w-3.5 shrink-0" />
+                                </span>
+                              </TooltipTrigger>
+                              <TooltipContent side="top" className="max-w-xs p-3 text-center shadow-xl">
+                                <div className="space-y-1">
+                                  <p className="font-bold text-white text-xs">
+                                    Total Hari Per Bulan Kalender
+                                  </p>
+                                  <p className="text-[11px] text-slate-200">
+                                    Rumus: <span className="font-mono font-bold text-amber-300">Hari Bulan − Status OFF</span>
+                                  </p>
+                                  <p className="text-[10px] text-slate-400 border-t border-slate-700/80 pt-1 mt-1">
+                                    Dihitung dari jumlah hari pada bulan baris terkait (28–31 hari) dikurangi akumulasi status OFF pegawai.
+                                  </p>
+                                </div>
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        </div>
+                      </th>
                       <th className="px-3 py-3 text-center">Total Kehadiran</th>
                     </tr>
                   </thead>

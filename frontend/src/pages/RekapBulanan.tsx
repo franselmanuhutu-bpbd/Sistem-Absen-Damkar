@@ -6,10 +6,11 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { FileSpreadsheet, FileText, Loader2, Search, X } from "lucide-react";
+import { FileSpreadsheet, FileText, Info, Loader2, Search, X } from "lucide-react";
 import { toast } from "sonner";
 import { TableSkeleton } from "@/components/ui/table-skeleton";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/components/ui/tooltip";
 
 const curMonth = new Date().toISOString().slice(0, 7);
 
@@ -22,6 +23,10 @@ export default function RekapBulanan() {
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [exp, setExp] = useState("");
+
+  const totalDaysMonth = month
+    ? new Date(Number(month.slice(0, 4)), Number(month.slice(5, 7)), 0).getDate()
+    : 0;
 
   useEffect(() => {
     api.get("/teams").then((r) => setTeams(r.data));
@@ -172,7 +177,33 @@ export default function RekapBulanan() {
                   <th className="px-3 py-3">Kategori</th>
                   <th className="hidden px-3 py-3 lg:table-cell">Jabatan</th>
                   {STATUSES.map((s) => <th key={s} className="px-2 py-3 text-center">{s}</th>)}
-                  <th className="px-3 py-3 text-center">Jumlah Hari Kerja</th>
+                  <th className="px-3 py-3 text-center">
+                    <div className="inline-flex items-center justify-center gap-1.5">
+                      <span>Jumlah Hari Kerja</span>
+                      <TooltipProvider delayDuration={150}>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <span className="inline-flex cursor-pointer items-center text-blue-500 hover:text-blue-700 transition-colors p-0.5 rounded-full hover:bg-blue-50">
+                              <Info className="h-3.5 w-3.5 shrink-0" />
+                            </span>
+                          </TooltipTrigger>
+                          <TooltipContent side="top" className="max-w-xs p-3 text-center shadow-xl">
+                            <div className="space-y-1">
+                              <p className="font-bold text-white text-xs">
+                                Total Hari {month ? monthLabel(month) : "Bulan"}: <span className="text-emerald-400">{totalDaysMonth} Hari</span>
+                              </p>
+                              <p className="text-[11px] text-slate-200">
+                                Rumus: <span className="font-mono font-bold text-amber-300">{totalDaysMonth} − Status OFF</span>
+                              </p>
+                              <p className="text-[11px] text-slate-400 border-t border-slate-700/80 pt-1 mt-1">
+                                Hari kerja dihitung dari total hari kalender bulan ({totalDaysMonth} hari) dikurangi akumulasi status OFF per pegawai.
+                              </p>
+                            </div>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    </div>
+                  </th>
                   <th className="px-3 py-3 text-center">Total Kehadiran</th>
                 </tr>
               </thead>
