@@ -63,13 +63,25 @@ async def dashboard(date: str = None, user: dict = Depends(get_current_user)):
 
     records = (await db.table("attendance").select("*").eq("date", ref).limit(10000).execute()).data or []
 
+    rec_team_map = {
+        r["employee_id"]: r["team_id"]
+        for r in records
+        if r.get("team_id") and r.get("employee_id") in active_ids
+    }
+    today_team_map = (
+        await resolve_teams_for_date(today_iso)
+        if ref != today_iso
+        else team_map
+    )
+
     def empty():
         return {s: 0 for s in STATUSES}
 
     totals = empty()
     per_team = {t["id"]: {"team": t, "members": 0, **empty()} for t in teams}
     for e in active_emps:
-        tid = team_map.get(e["id"])
+        eid = e["id"]
+        tid = team_map.get(eid) or rec_team_map.get(eid) or today_team_map.get(eid)
         if tid in per_team:
             per_team[tid]["members"] += 1
 
@@ -80,7 +92,7 @@ async def dashboard(date: str = None, user: dict = Depends(get_current_user)):
         status = str(record.get("status") or "").strip().upper()
         if status not in STATUSES:
             continue
-        team_id = record.get("team_id") or team_map.get(employee_id)
+        team_id = record.get("team_id") or team_map.get(employee_id) or today_team_map.get(employee_id)
         totals[status] += 1
         if team_id in per_team:
             per_team[team_id][status] += 1
@@ -90,10 +102,12 @@ async def dashboard(date: str = None, user: dict = Depends(get_current_user)):
     kasubid_tasks = [resolve_kasubid_for_date(pid, ref) for pid, _ in kasubid_keys]
     team_list = list(per_team.values())
     commander_tasks = [resolve_commander_for_date(t["team"]["id"], ref) for t in team_list]
+    today_commander_tasks = [resolve_commander_for_date(t["team"]["id"], today_iso) for t in team_list] if ref != today_iso else []
 
-    resolved_ids = await asyncio.gather(*kasubid_tasks, *commander_tasks)
+    resolved_ids = await asyncio.gather(*kasubid_tasks, *commander_tasks, *today_commander_tasks)
     kasubid_eids = resolved_ids[:len(kasubid_keys)]
-    commander_eids = resolved_ids[len(kasubid_keys):]
+    commander_eids = resolved_ids[len(kasubid_keys):len(kasubid_keys) + len(team_list)]
+    today_commander_eids = resolved_ids[len(kasubid_keys) + len(team_list):] if ref != today_iso else commander_eids
 
     kasubid = []
     for (pid, plabel), eid in zip(kasubid_keys, kasubid_eids):
@@ -109,13 +123,23 @@ async def dashboard(date: str = None, user: dict = Depends(get_current_user)):
             "status": "Aktif" if eid and nama else "Kosong",
         })
 
-    for t, cid in zip(team_list, commander_eids):
-        cname = emp_names.get(cid)
-        if not cname and cid:
-            cemp = (await db.table("employees").select("nama").eq("id", cid).limit(1).execute()).data
+    for idx, (t, cid) in enumerate(zip(team_list, commander_eids)):
+        today_cid = today_commander_eids[idx]
+        effective_cid = cid or today_cid
+        cname = emp_names.get(effective_cid)
+        if not cname and effective_cid:
+            cemp = (await db.table("employees").select("nama").eq("id", effective_cid).limit(1).execute()).data
             cname = cemp[0]["nama"] if cemp else None
-        t["commander_id"] = cid
+
+        today_cname = emp_names.get(today_cid)
+        if not today_cname and today_cid:
+            cemp = (await db.table("employees").select("nama").eq("id", today_cid).limit(1).execute()).data
+            today_cname = cemp[0]["nama"] if cemp else None
+
+        t["commander_id"] = effective_cid
         t["commander_name"] = cname
+        t["current_commander_id"] = today_cid
+        t["current_commander_name"] = today_cname
 
     return {
         "date": ref,
@@ -136,10 +160,12 @@ async def org_structure(date: str = None, user: dict = Depends(get_current_user)
     ref = date or _date.today().isoformat()
     teams = (await db.table("teams").select("*").order("order").limit(100).execute()).data or []
     team_map = await resolve_teams_for_date(ref)
+    today_team_map = await resolve_teams_for_date(_date.today().isoformat()) if ref != _date.today().isoformat() else team_map
     emps = {e["id"]: e for e in ((await db.table("employees").select("*").eq("status", "ACTIVE").limit(5000).execute()).data or [])}
     counts = {}
-    for eid, tid in team_map.items():
-        if eid in emps:
+    for eid in emps:
+        tid = team_map.get(eid) or today_team_map.get(eid)
+        if tid:
             counts[tid] = counts.get(tid, 0) + 1
     kasubid = []
     for pid, label in KASUBID_POSITIONS:
@@ -151,6 +177,8 @@ async def org_structure(date: str = None, user: dict = Depends(get_current_user)
     team_out = []
     for t in teams:
         cid = await resolve_commander_for_date(t["id"], ref)
+        if not cid and ref != _date.today().isoformat():
+            cid = await resolve_commander_for_date(t["id"], _date.today().isoformat())
         team_out.append({**t, "members_count": counts.get(t["id"], 0),
                          "commander_id": cid, "commander_name": emps.get(cid, {}).get("nama") if cid else None})
     return {"date": ref, "kasubid": kasubid, "teams": team_out}

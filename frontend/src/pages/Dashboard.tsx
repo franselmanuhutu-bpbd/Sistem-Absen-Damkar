@@ -30,6 +30,8 @@ interface PerTeamData {
   members: number;
   commander_id?: string | null;
   commander_name?: string | null;
+  current_commander_id?: string | null;
+  current_commander_name?: string | null;
   [status: string]: any;
 }
 
@@ -472,9 +474,14 @@ export default function Dashboard() {
                     </div>
                     <div>
                       <p className="font-heading font-bold text-slate-900">{t.team.name}</p>
-                      <p className="text-xs text-slate-400">
+                      <p className="text-xs text-slate-500">
                         {t.members} anggota · ⭐ {t.commander_name || "—"}
                       </p>
+                      {t.current_commander_name && t.current_commander_name !== t.commander_name && (
+                        <p className="text-[11px] text-slate-400 mt-0.5">
+                          Saat ini: ⭐ {t.current_commander_name}
+                        </p>
+                      )}
                     </div>
                   </div>
                 </div>
