@@ -109,7 +109,7 @@ async def export_excel(
         cell.font = data_font_bold
         cell.alignment = center
         cell.border = border
-    cell_jhk = ws.cell(row=r, column=len(cols) - 1, value=sum(row["jumlah_hari_kerja"] for row in data["rows"]))
+    cell_jhk = ws.cell(row=r, column=len(cols) - 1, value=sum(row.get("jumlah_hari_kerja", 0) for row in data["rows"]))
     cell_jhk.font = data_font_bold
     cell_jhk.alignment = center
     cell_jhk.border = border
@@ -365,7 +365,7 @@ async def export_pdf(
             Paragraph(str(data["grand_total"][s]), table_cell_center_bold)
             for s in STATUSES
         ] + [
-            Paragraph(str(sum(row["jumlah_hari_kerja"] for row in data["rows"])), table_cell_center_bold),
+            Paragraph(str(sum(row.get("jumlah_hari_kerja", 0) for row in data["rows"])), table_cell_center_bold),
             Paragraph(str(data["grand_total"]["HDR"]), table_cell_center_bold),
         ]
         table_data.append(total_row)
@@ -539,7 +539,7 @@ async def export_kasubid_excel(
         c.font = data_font_bold
         c.alignment = center
         c.border = border
-    c_jhk = ws.cell(row=r, column=10, value=sum(p["jumlah_hari_kerja"] for p in data["positions"]))
+    c_jhk = ws.cell(row=r, column=10, value=sum(p.get("jumlah_hari_kerja", 0) for p in data["positions"]))
     c_jhk.font = data_font_bold
     c_jhk.alignment = center
     c_jhk.border = border
@@ -745,7 +745,7 @@ async def export_kasubid_pdf(
         Paragraph(str(sum(p[s] for p in data["positions"])), table_cell_center_bold)
         for s in STATUSES
     ] + [
-        Paragraph(str(sum(p["jumlah_hari_kerja"] for p in data["positions"])), table_cell_center_bold),
+        Paragraph(str(sum(p.get("jumlah_hari_kerja", 0) for p in data["positions"])), table_cell_center_bold),
         Paragraph(str(sum(p["total_kehadiran"] for p in data["positions"])), table_cell_center_bold),
     ]
     td.append(total_row)

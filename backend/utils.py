@@ -167,7 +167,7 @@ async def _compute_recap(start_month: str, end_month: str, team_id: Optional[str
     rows = []
     breakdown = []
     grand = {s: 0 for s in STATUSES}
-    jumlah_hari_kerja = sum(last_day_of_month(int(m[:4]), int(m[5:7])) for m in months)
+    total_days_month = sum(last_day_of_month(int(m[:4]), int(m[5:7])) for m in months)
 
     for e in employees:
         eid = e["id"]
@@ -189,35 +189,38 @@ async def _compute_recap(start_month: str, end_month: str, team_id: Optional[str
             regu_label = teams.get(tid_now, {}).get("name", "-") if tid_now else "-"
         for s in STATUSES:
             grand[s] += counts[s]
+        emp_jhk = max(0, total_days_month - counts.get("OFF", 0))
         rows.append({
             "employee_id": eid, "no": e["no"], "nip": e["nip"], "nama": e["nama"],
             "jabatan": e["jabatan"], "pangkat": e["pangkat"], "category": cat,
             "team_ids": team_ids_ordered, "regu": regu_label,
-            **counts, "total": total, "jumlah_hari_kerja": jumlah_hari_kerja,
+            **counts, "total": total, "jumlah_hari_kerja": emp_jhk,
             "total_kehadiran": counts["HDR"],
         })
         emp_breaks = sorted([(k, v) for k, v in mt.items() if k[0] == eid], key=lambda kv: (kv[0][2], kv[0][1] or ""))
         for (ee, tid, mo), cc in emp_breaks:
+            mo_days = last_day_of_month(int(mo[:4]), int(mo[5:7]))
+            mo_jhk = max(0, mo_days - cc.get("OFF", 0))
             breakdown.append({
                 "employee_id": eid, "no": e["no"], "nip": e["nip"], "nama": e["nama"],
                 "team_id": tid, "regu": teams.get(tid, {}).get("name", "-"), "category": cat,
                 "month": mo, "month_label": _month_label(mo),
                 **cc, "total": sum(cc.values()),
-                "jumlah_hari_kerja": last_day_of_month(int(mo[:4]), int(mo[5:7])),
+                "jumlah_hari_kerja": mo_jhk,
                 "total_kehadiran": cc["HDR"],
             })
     return {
         "months": months, "rows": rows, "breakdown": breakdown, "grand_total": grand,
         "total_pegawai": len(rows),
         "period_label": _period_label(start_month, end_month),
-        "jumlah_hari_kerja": jumlah_hari_kerja,
+        "jumlah_hari_kerja": total_days_month,
     }
 
 
 async def _compute_kasubid_recap(start_month: str, end_month: str):
     db = await get_db()
     months = month_range(start_month, end_month)
-    jumlah_hari_kerja = sum(last_day_of_month(int(m[:4]), int(m[5:7])) for m in months)
+    total_days_month = sum(last_day_of_month(int(m[:4]), int(m[5:7])) for m in months)
     sd = f"{start_month}-01"
     ey, em = int(end_month[:4]), int(end_month[5:7])
     ed = f"{end_month}-{last_day_of_month(ey, em):02d}"
@@ -268,16 +271,17 @@ async def _compute_kasubid_recap(start_month: str, end_month: str):
                                    "nama": nm, "status": st})
             d += timedelta(days=1)
 
+        pos_jhk = max(0, total_days_month - counts.get("OFF", 0))
         positions.append({
             "position_id": pid, "label": label, "holders": holders,
             "nama": " / ".join(holders) if holders else "-",
             **counts,
-            "jumlah_hari_kerja": jumlah_hari_kerja,
+            "jumlah_hari_kerja": pos_jhk,
             "total_kehadiran": counts["HDR"],
             "total": sum(counts.values()),
             "monthly": [{
                 "month": m, "month_label": _month_label(m), **monthly[m],
-                "jumlah_hari_kerja": last_day_of_month(int(m[:4]), int(m[5:7])),
+                "jumlah_hari_kerja": max(0, last_day_of_month(int(m[:4]), int(m[5:7])) - monthly[m].get("OFF", 0)),
                 "total_kehadiran": monthly[m]["HDR"],
                 "total": sum(monthly[m].values()),
             } for m in months],
@@ -287,5 +291,5 @@ async def _compute_kasubid_recap(start_month: str, end_month: str):
     return {
         "months": months, "positions": positions, "detail": detail,
         "period_label": _period_label(start_month, end_month),
-        "jumlah_hari_kerja": jumlah_hari_kerja,
+        "jumlah_hari_kerja": total_days_month,
     }

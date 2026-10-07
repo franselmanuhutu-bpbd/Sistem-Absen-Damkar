@@ -164,7 +164,7 @@ export default function RekapBulanan() {
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-slate-200 bg-slate-50 text-left text-xs uppercase text-slate-500">
+                <tr className="border-b bg-slate-50 text-left text-xs uppercase text-slate-500">
                   <th className="px-3 py-3">No</th>
                   <th className="px-3 py-3">NIP</th>
                   <th className="px-3 py-3">Nama</th>

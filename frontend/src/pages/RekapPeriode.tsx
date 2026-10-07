@@ -222,12 +222,15 @@ export default function RekapPeriode() {
 
         <TabsContent value="total">
           <Card className="overflow-hidden border-slate-200">
-            {loading ? <TableSkeleton rows={8} columns={7} /> : (
+            {loading ? 
+            <TableSkeleton rows={8} columns={7} /> : (
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b bg-slate-50 text-left text-xs uppercase text-slate-500">
-                      <th className="px-3 py-3">No</th><th className="px-3 py-3">NIP</th><th className="px-3 py-3">Nama</th>
+                      <th className="px-3 py-3">No</th>
+                      <th className="px-3 py-3">NIP</th>
+                      <th className="px-3 py-3">Nama</th>
                       <th className="px-3 py-3">Regu</th>
                       <th className="px-3 py-3">Kategori</th>
                       {STATUSES.map((s) => <th key={s} className="px-2 py-3 text-center">{s}</th>)}
