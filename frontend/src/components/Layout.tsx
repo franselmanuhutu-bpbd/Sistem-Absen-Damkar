@@ -141,7 +141,7 @@ export function Layout({ children }: { children: ReactNode }) {
               {current?.label || "DAMKAR"}
             </h1>
             <p className="hidden text-xs text-slate-500 sm:block mt-0.5">
-              BPBD Kab. Mimika — Bidang Pemadam Kebakaran
+              BPBD Kab. Mimika | Bidang Pemadam Kebakaran
             </p>
           </div>
           <NetworkStatusBadge />
