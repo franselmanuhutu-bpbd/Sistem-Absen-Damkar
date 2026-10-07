@@ -9,28 +9,37 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
-interface NavItem {
-  label: string;
-  icon: LucideIcon;
-  path: string;
-  roles: string[];
-}
+type NavItem =
+  | {
+      type: "route";
+      label: string;
+      icon: LucideIcon;
+      path: string;
+      roles: string[];
+    }
+  | {
+      type: "spacer";
+    };
 
 const NAV: NavItem[] = [
-  { label: "Dashboard", icon: LayoutDashboard, path: "/dashboard", roles: ["admin", "operator", "viewer", "komandan", "kasubid", "staff"] },
-  { label: "Absensi Staff", icon: ClipboardCheck, path: "/input-absensi", roles: ["admin", "operator"] },
-  { label: "Absensi Kasubid", icon: Star, path: "/absensi-kasubid", roles: ["admin", "operator"] },
-  { label: "Absensi Saya", icon: UserCircle, path: "/absensi-saya", roles: ["staff", "kasubid", "komandan", "operator"] },
-  { label: "Kalender Absensi", icon: Calendar, path: "/kalender", roles: ["admin", "operator", "viewer"] },
-  { label: "Rekap Bulanan", icon: BarChart3, path: "/rekap-bulanan", roles: ["admin", "operator", "viewer", "kasubid", "komandan"] },
-  { label: "Rekap Periode", icon: FileSpreadsheet, path: "/rekap-periode", roles: ["admin", "operator", "viewer", "kasubid"] },
-  { label: "Rekap Kasubid", icon: Star, path: "/rekap-kasubid", roles: ["admin", "operator", "viewer", "kasubid"] },
-  { label: "Data Pegawai", icon: Users, path: "/data-pegawai", roles: ["admin", "operator"] },
-  { label: "Manajemen Regu", icon: ShieldAlert, path: "/manajemen-regu", roles: ["admin", "operator"] },
-  { label: "Pengaturan Kasubid", icon: Settings, path: "/pengaturan-kasubid", roles: ["admin"] },
-  { label: "Laporan & Export", icon: FileDown, path: "/laporan-export", roles: ["admin", "operator", "viewer"] },
-  { label: "User Management", icon: UserCog, path: "/user-management", roles: ["admin"] },
-  { label: "Audit Log", icon: History, path: "/audit-log", roles: ["admin"] },
+  { type:"route", label: "Dashboard", icon: LayoutDashboard, path: "/dashboard", roles: ["admin", "operator", "viewer", "komandan", "kasubid", "staff"] },
+  { type:"spacer" },
+  { type:"route", label: "Absensi Staff", icon: ClipboardCheck, path: "/input-absensi", roles: ["admin", "operator"] },
+  { type:"route", label: "Absensi Kasubid", icon: Star, path: "/absensi-kasubid", roles: ["admin", "operator"] },
+  { type:"route", label: "Absensi Saya", icon: UserCircle, path: "/absensi-saya", roles: ["staff", "kasubid", "komandan", "operator"] },
+  { type:"route", label: "Kalender Absensi", icon: Calendar, path: "/kalender", roles: ["admin", "operator", "viewer"] },
+  { type:"spacer" },
+  { type:"route", label: "Rekap Bulanan", icon: BarChart3, path: "/rekap-bulanan", roles: ["admin", "operator", "viewer", "kasubid", "komandan"] },
+  { type:"route", label: "Rekap Periode", icon: FileSpreadsheet, path: "/rekap-periode", roles: ["admin", "operator", "viewer", "kasubid"] },
+  { type:"route", label: "Rekap Kasubid", icon: Star, path: "/rekap-kasubid", roles: ["admin", "operator", "viewer", "kasubid"] },
+  { type:"spacer" },
+  { type:"route", label: "Data Pegawai", icon: Users, path: "/data-pegawai", roles: ["admin", "operator"] },
+  { type:"route", label: "Manajemen Regu", icon: ShieldAlert, path: "/manajemen-regu", roles: ["admin", "operator"] },
+  { type:"route", label: "Pengaturan Kasubid", icon: Settings, path: "/pengaturan-kasubid", roles: ["admin"] },
+  { type:"spacer" },
+  { type:"route", label: "Laporan & Export", icon: FileDown, path: "/laporan-export", roles: ["admin", "operator", "viewer"] },
+  { type:"route", label: "User Management", icon: UserCog, path: "/user-management", roles: ["admin"] },
+  { type:"route", label: "Audit Log", icon: History, path: "/audit-log", roles: ["admin"] },
 ];
 
 export function Layout({ children }: { children: ReactNode }) {
@@ -38,8 +47,11 @@ export function Layout({ children }: { children: ReactNode }) {
   const [open, setOpen] = useState(false);
   const loc = useLocation();
   const userRole = (user && typeof user === "object" && user.role) ? user.role : "";
-  const links = NAV.filter((n) => n.roles.includes(userRole));
-  const current = NAV.find((n) => loc.pathname.startsWith(n.path));
+  const links = NAV.filter((n) => n.type === "spacer" || n.roles.includes(userRole));
+  const current = NAV.find(
+    (n): n is Extract<NavItem, { type: "route" }> =>
+      n.type === "route" && loc.pathname.startsWith(n.path),
+  );
 
   const userName = (user && typeof user === "object" && user.name) ? user.name : "User";
 
@@ -55,7 +67,11 @@ export function Layout({ children }: { children: ReactNode }) {
         </div>
       </div>
       <nav className="sidebar-scroll flex-1 overflow-y-auto px-3 py-4 space-y-1">
-        {links.map((n) => {
+        {links.map((n, index) => {
+          if (n.type === "spacer") {
+            return <div key={`spacer-${index}`} className="border-b border-white/10 my-2" aria-hidden="true" />;
+          }
+
           const Icon = n.icon;
           return (
             <NavLink
