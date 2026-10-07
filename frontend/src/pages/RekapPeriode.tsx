@@ -4,13 +4,14 @@ import { STATUSES, STATUS_CONFIG, monthLabel, MONTH_NAMES } from "@/lib/constant
 import { MonthPicker } from "@/components/MonthPicker";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { FileSpreadsheet, FileText, Loader2 } from "lucide-react";
+import { FileSpreadsheet, FileText, Loader2, Search, X } from "lucide-react";
 import { toast } from "sonner";
 import { TableSkeleton } from "@/components/ui/table-skeleton";
 
-function addMonths(ym, n) {
+function addMonths(ym: string, n: number) {
   let [y, m] = ym.split("-").map(Number);
   m += n;
   while (m > 12) { m -= 12; y += 1; }
@@ -26,8 +27,9 @@ export default function RekapPeriode() {
   const [quick, setQuick] = useState(3);
   const [teamId, setTeamId] = useState("all");
   const [category, setCategory] = useState("all");
-  const [teams, setTeams] = useState([]);
-  const [data, setData] = useState(null);
+  const [search, setSearch] = useState("");
+  const [teams, setTeams] = useState<any[]>([]);
+  const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [exp, setExp] = useState("");
 
@@ -75,6 +77,31 @@ export default function RekapPeriode() {
   const g = data?.grand_total || {};
   const months = data?.months || [];
 
+  const filteredRows = (data?.rows || []).filter((r: any) => {
+    const q = search.trim().toLowerCase();
+    if (!q) return true;
+    const matchName = r.nama ? r.nama.toLowerCase().includes(q) : false;
+    const matchNip = r.nip ? String(r.nip).toLowerCase().includes(q) : false;
+    return matchName || matchNip;
+  });
+
+  const filteredGrand = filteredRows.reduce((acc: any, r: any) => {
+    STATUSES.forEach((s) => {
+      acc[s] = (acc[s] || 0) + (r[s] || 0);
+    });
+    return acc;
+  }, {});
+
+  const displayGrand = search.trim() ? filteredGrand : g;
+
+  const filteredBreakdown = (data?.breakdown || []).filter((b: any) => {
+    const q = search.trim().toLowerCase();
+    if (!q) return true;
+    const matchName = b.nama ? b.nama.toLowerCase().includes(q) : false;
+    const matchNip = b.nip ? String(b.nip).toLowerCase().includes(q) : false;
+    return matchName || matchNip;
+  });
+
   return (
     <div className="space-y-5">
       <div>
@@ -96,7 +123,7 @@ export default function RekapPeriode() {
             </Button>
           ))}
         </div>
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
           <div className="space-y-1.5 flex flex-col">
             <label className="text-sm font-medium text-slate-600">Bulan Mulai</label>
             <MonthPicker
@@ -137,6 +164,28 @@ export default function RekapPeriode() {
                 <SelectItem value="Kasubid">Kasubid</SelectItem>
               </SelectContent>
             </Select>
+          </div>
+          <div className="space-y-1.5">
+            <label className="text-sm font-medium text-slate-600">Cari Pegawai</label>
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400 pointer-events-none" />
+              <Input
+                placeholder="Cari nama atau NIP..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="h-11 pl-9 pr-8 bg-white"
+                data-testid="search-rekap-periode"
+              />
+              {search && (
+                <button
+                  type="button"
+                  onClick={() => setSearch("")}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              )}
+            </div>
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2 border-t border-slate-100 pt-3">
@@ -187,7 +236,7 @@ export default function RekapPeriode() {
                     </tr>
                   </thead>
                   <tbody>
-                    {(data?.rows || []).map((r) => (
+                    {filteredRows.map((r: any) => (
                       <tr key={r.employee_id} className="border-b border-slate-100 hover:bg-slate-50">
                         <td className="px-3 py-2.5 text-slate-400">{r.no}</td>
                         <td className="px-3 py-2.5 font-mono text-xs text-slate-500">{r.nip}</td>
@@ -202,13 +251,20 @@ export default function RekapPeriode() {
                         <td className="px-3 py-2.5 text-center font-extrabold text-slate-900">{r.total_kehadiran}</td>
                       </tr>
                     ))}
+                    {filteredRows.length === 0 && (
+                      <tr>
+                        <td colSpan={13} className="py-12 text-center text-slate-400">
+                          {search ? `Tidak ada pegawai yang sesuai dengan pencarian "${search}".` : "Tidak ada data pada periode ini."}
+                        </td>
+                      </tr>
+                    )}
                   </tbody>
                   <tfoot>
                     <tr className="bg-slate-100 font-bold">
-                      <td className="px-3 py-3" colSpan={5}>TOTAL</td>
-                      {STATUSES.map((s) => <td key={s} className="px-2 py-3 text-center">{g[s] ?? 0}</td>)}
-                      <td className="px-3 py-3 text-center">{(data?.rows || []).reduce((a, r) => a + (r.jumlah_hari_kerja || 0), 0)}</td>
-                      <td className="px-3 py-3 text-center">{g.HDR ?? 0}</td>
+                      <td className="px-3 py-3" colSpan={5}>TOTAL ({filteredRows.length}{search ? ` dari ${data?.total_pegawai || 0}` : ""} pegawai)</td>
+                      {STATUSES.map((s) => <td key={s} className="px-2 py-3 text-center">{displayGrand[s] ?? 0}</td>)}
+                      <td className="px-3 py-3 text-center">{filteredRows.reduce((a: number, r: any) => a + (r.jumlah_hari_kerja || 0), 0)}</td>
+                      <td className="px-3 py-3 text-center">{displayGrand.HDR ?? 0}</td>
                     </tr>
                   </tfoot>
                 </table>
@@ -235,7 +291,7 @@ export default function RekapPeriode() {
                     </tr>
                   </thead>
                   <tbody>
-                    {(data?.breakdown || []).map((b, i) => (
+                    {filteredBreakdown.map((b: any, i: number) => (
                       <tr key={i} className="border-b border-slate-100 hover:bg-slate-50" data-testid={`breakdown-row-${i}`}>
                         <td className="px-3 py-2.5 text-slate-400">{b.no}</td>
                         <td className="px-3 py-2.5 font-semibold text-slate-800">{b.nama}</td>
@@ -246,8 +302,8 @@ export default function RekapPeriode() {
                         <td className="px-3 py-2.5 text-center font-extrabold text-slate-900">{b.total_kehadiran}</td>
                       </tr>
                     ))}
-                    {(data?.breakdown || []).length === 0 && (
-                      <tr><td colSpan={12} className="py-10 text-center text-slate-400">Tidak ada data pada periode ini.</td></tr>
+                    {filteredBreakdown.length === 0 && (
+                      <tr><td colSpan={12} className="py-10 text-center text-slate-400">{search ? `Tidak ada data yang sesuai dengan pencarian "${search}".` : "Tidak ada data pada periode ini."}</td></tr>
                     )}
                   </tbody>
                 </table>

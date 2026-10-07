@@ -4,8 +4,9 @@ import { STATUSES, STATUS_CONFIG, monthLabel } from "@/lib/constants";
 import { MonthPicker } from "@/components/MonthPicker";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { FileSpreadsheet, FileText, Loader2 } from "lucide-react";
+import { FileSpreadsheet, FileText, Loader2, Search, X } from "lucide-react";
 import { toast } from "sonner";
 import { TableSkeleton } from "@/components/ui/table-skeleton";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -16,8 +17,9 @@ export default function RekapBulanan() {
   const [month, setMonth] = useState(curMonth);
   const [teamId, setTeamId] = useState("all");
   const [category, setCategory] = useState("all");
-  const [teams, setTeams] = useState([]);
-  const [data, setData] = useState(null);
+  const [search, setSearch] = useState("");
+  const [teams, setTeams] = useState<any[]>([]);
+  const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [exp, setExp] = useState("");
 
@@ -56,6 +58,23 @@ export default function RekapBulanan() {
 
   const g = data?.grand_total || {};
 
+  const filteredRows = (data?.rows || []).filter((r: any) => {
+    const q = search.trim().toLowerCase();
+    if (!q) return true;
+    const matchName = r.nama ? r.nama.toLowerCase().includes(q) : false;
+    const matchNip = r.nip ? String(r.nip).toLowerCase().includes(q) : false;
+    return matchName || matchNip;
+  });
+
+  const filteredGrand = filteredRows.reduce((acc: any, r: any) => {
+    STATUSES.forEach((s) => {
+      acc[s] = (acc[s] || 0) + (r[s] || 0);
+    });
+    return acc;
+  }, {});
+
+  const displayGrand = search.trim() ? filteredGrand : g;
+
   return (
     <div className="space-y-5">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -80,6 +99,25 @@ export default function RekapBulanan() {
               <SelectItem value="Kasubid">Kasubid</SelectItem>
             </SelectContent>
           </Select>
+          <div className="relative min-w-[200px] flex-1 sm:flex-initial sm:w-56">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400 pointer-events-none" />
+            <Input
+              placeholder="Cari nama atau NIP..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="h-10 pl-9 pr-8 bg-white"
+              data-testid="search-rekap-month"
+            />
+            {search && (
+              <button
+                type="button"
+                onClick={() => setSearch("")}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            )}
+          </div>
           <Button onClick={() => doExport("excel")} disabled={!!exp} data-testid="export-excel-btn" className="gap-2 bg-emerald-600 hover:bg-emerald-700">
             {exp === "excel" ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileSpreadsheet className="h-4 w-4" />} Excel
           </Button>
@@ -139,7 +177,7 @@ export default function RekapBulanan() {
                 </tr>
               </thead>
               <tbody>
-                {(data?.rows || []).map((r) => (
+                {filteredRows.map((r: any) => (
                   <tr key={r.employee_id} className="border-b border-slate-100 hover:bg-slate-50" data-testid={`rekap-row-${r.employee_id}`}>
                     <td className="px-3 py-2.5 text-slate-400">{r.no}</td>
                     <td className="px-3 py-2.5 font-mono text-xs text-slate-500">{r.nip}</td>
@@ -156,16 +194,23 @@ export default function RekapBulanan() {
                     <td className="px-3 py-2.5 text-center font-extrabold text-slate-900">{r.total_kehadiran}</td>
                   </tr>
                 ))}
+                {filteredRows.length === 0 && (
+                  <tr>
+                    <td colSpan={13} className="py-12 text-center text-slate-400">
+                      {search ? `Tidak ada pegawai yang sesuai dengan pencarian "${search}".` : "Tidak ada data pada bulan ini."}
+                    </td>
+                  </tr>
+                )}
               </tbody>
               <tfoot>
                 <tr className="bg-slate-100 font-bold text-slate-800">
-                  <td className="px-3 py-3" colSpan={5}>TOTAL ({data?.total_pegawai || 0} pegawai)</td>
+                  <td className="px-3 py-3" colSpan={5}>TOTAL ({filteredRows.length}{search ? ` dari ${data?.total_pegawai || 0}` : ""} pegawai)</td>
                   <td className="hidden lg:table-cell" />
                   {STATUSES.map((s) => (
-                    <td key={s} className="px-2 py-3 text-center">{g[s] ?? 0}</td>
+                    <td key={s} className="px-2 py-3 text-center">{displayGrand[s] ?? 0}</td>
                   ))}
-                  <td className="px-3 py-3 text-center">{(data?.rows || []).reduce((a, r) => a + (r.jumlah_hari_kerja || 0), 0)}</td>
-                  <td className="px-3 py-3 text-center">{g.HDR ?? 0}</td>
+                  <td className="px-3 py-3 text-center">{filteredRows.reduce((a: number, r: any) => a + (r.jumlah_hari_kerja || 0), 0)}</td>
+                  <td className="px-3 py-3 text-center">{displayGrand.HDR ?? 0}</td>
                 </tr>
               </tfoot>
             </table>

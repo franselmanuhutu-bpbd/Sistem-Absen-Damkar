@@ -6,18 +6,19 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Star, UserPlus, UserMinus, History } from "lucide-react";
+import { Star, UserPlus, UserMinus, History, Search, X } from "lucide-react";
 import { toast } from "sonner";
+import { EmployeeSearchSelect } from "@/components/EmployeeSearchSelect";
 
 const today = new Date().toISOString().slice(0, 10);
 
 export default function PengaturanKasubid() {
-  const [positions, setPositions] = useState([]);
-  const [employees, setEmployees] = useState([]);
-  const [setForm, setSetForm] = useState(null);
-  const [vacForm, setVacForm] = useState(null);
-  const [histPos, setHistPos] = useState(null);
+  const [positions, setPositions] = useState<any[]>([]);
+  const [employees, setEmployees] = useState<any[]>([]);
+  const [search, setSearch] = useState("");
+  const [setForm, setSetForm] = useState<any>(null);
+  const [vacForm, setVacForm] = useState<any>(null);
+  const [histPos, setHistPos] = useState<any>(null);
 
   const load = () => api.get("/kasubid").then((r) => setPositions(r.data));
   useEffect(() => { load(); api.get("/employees", { params: { status: "ACTIVE" } }).then((r) => setEmployees(r.data)); }, []);
@@ -37,17 +38,47 @@ export default function PengaturanKasubid() {
     } catch (e) { toast.error(apiError(e)); }
   };
 
-  const statusColor = (s) => s === "Aktif" ? "bg-emerald-100 text-emerald-700" : "bg-slate-200 text-slate-600";
+  const statusColor = (s: string) => s === "Aktif" ? "bg-emerald-100 text-emerald-700" : "bg-slate-200 text-slate-600";
+
+  const filteredPositions = positions.filter((p: any) => {
+    const q = search.trim().toLowerCase();
+    if (!q) return true;
+    const matchName = p.nama ? p.nama.toLowerCase().includes(q) : false;
+    const matchLabel = p.label ? p.label.toLowerCase().includes(q) : false;
+    const matchJabatan = p.jabatan ? p.jabatan.toLowerCase().includes(q) : false;
+    return matchName || matchLabel || matchJabatan;
+  });
 
   return (
     <div className="space-y-5">
-      <div>
-        <h2 className="font-heading text-2xl font-bold text-slate-900">Pengaturan Jabatan — Kasubid</h2>
-        <p className="text-sm text-slate-500">Kelola pejabat Kasubid: tetapkan, ganti, atau kosongkan posisi. Riwayat absensi lama tetap aman.</p>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h2 className="font-heading text-2xl font-bold text-slate-900">Pengaturan Jabatan — Kasubid</h2>
+          <p className="text-sm text-slate-500">Kelola pejabat Kasubid: tetapkan, ganti, atau kosongkan posisi. Riwayat absensi lama tetap aman.</p>
+        </div>
+        <div className="relative min-w-[220px] sm:w-64">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400 pointer-events-none" />
+          <Input
+            placeholder="Cari nama atau jabatan..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="h-10 pl-9 pr-8 bg-white"
+            data-testid="search-kasubid-view"
+          />
+          {search && (
+            <button
+              type="button"
+              onClick={() => setSearch("")}
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        {positions.map((p) => (
+        {filteredPositions.map((p: any) => (
           <Card key={p.position_id} className="border-slate-200 p-5" data-testid={`pk-card-${p.position_id}`}>
             <div className="flex items-start justify-between">
               <div className="flex items-center gap-3">
@@ -75,6 +106,11 @@ export default function PengaturanKasubid() {
             </div>
           </Card>
         ))}
+        {filteredPositions.length === 0 && (
+          <div className="col-span-full py-12 text-center text-slate-400">
+            Tidak ada jabatan atau pejabat Kasubid yang sesuai dengan "{search}".
+          </div>
+        )}
       </div>
 
       {/* Set/Replace dialog */}
@@ -85,12 +121,13 @@ export default function PengaturanKasubid() {
             <div className="space-y-3">
               <div className="space-y-1.5">
                 <Label>Pejabat (dari data pegawai)</Label>
-                <Select value={setForm.employee_id} onValueChange={(v) => setSetForm({ ...setForm, employee_id: v })}>
-                  <SelectTrigger data-testid="pk-employee"><SelectValue placeholder="Pilih pegawai" /></SelectTrigger>
-                  <SelectContent className="max-h-64">
-                    {employees.map((e) => <SelectItem key={e.id} value={e.id}>{e.nama} — {e.nip}</SelectItem>)}
-                  </SelectContent>
-                </Select>
+                <EmployeeSearchSelect
+                  value={setForm.employee_id}
+                  onChange={(v) => setSetForm({ ...setForm, employee_id: v })}
+                  employees={employees}
+                  placeholder="Cari & pilih pejabat (nama atau NIP)..."
+                  data-testid="pk-employee"
+                />
               </div>
               <div className="space-y-1.5">
                 <Label>Berlaku mulai (tanggal pelantikan)</Label>

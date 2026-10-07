@@ -8,26 +8,28 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowRightLeft, Flame, Star, Loader2, Pencil, Crown, History, RotateCcw } from "lucide-react";
+import { ArrowRightLeft, Flame, Star, Loader2, Pencil, Crown, History, RotateCcw, Search, X } from "lucide-react";
 import { toast } from "sonner";
 import { TableSkeleton } from "@/components/ui/table-skeleton";
+import { EmployeeSearchSelect } from "@/components/EmployeeSearchSelect";
 
 const today = new Date().toISOString().slice(0, 10);
 
 export default function ManajemenRegu() {
   const { user } = useAuth();
-  const [teams, setTeams] = useState([]);
+  const [teams, setTeams] = useState<any[]>([]);
   const [activeTeam, setActiveTeam] = useState("");
-  const [detail, setDetail] = useState(null);
-  const [allEmp, setAllEmp] = useState([]);
-  const [kasubid, setKasubid] = useState([]);
+  const [detail, setDetail] = useState<any>(null);
+  const [allEmp, setAllEmp] = useState<any[]>([]);
+  const [kasubid, setKasubid] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
-  const [roll, setRoll] = useState(null);
-  const [rename, setRename] = useState(null);
-  const [cmd, setCmd] = useState(null);
-  const [ksForm, setKsForm] = useState(null);
-  const [hist, setHist] = useState(null);
-  const [histData, setHistData] = useState([]);
+  const [memberSearch, setMemberSearch] = useState("");
+  const [roll, setRoll] = useState<any>(null);
+  const [rename, setRename] = useState<any>(null);
+  const [cmd, setCmd] = useState<any>(null);
+  const [ksForm, setKsForm] = useState<any>(null);
+  const [hist, setHist] = useState<any>(null);
+  const [histData, setHistData] = useState<any[]>([]);
   const [resetOpen, setResetOpen] = useState(false);
   const isAdmin = Boolean(user && user.role === "admin");
 
@@ -84,6 +86,14 @@ export default function ManajemenRegu() {
   };
 
   const curTeam = teams.find((t) => t.id === activeTeam);
+
+  const filteredMembers = (detail?.members || []).filter((e: any) => {
+    const q = memberSearch.trim().toLowerCase();
+    if (!q) return true;
+    const matchName = e.nama ? e.nama.toLowerCase().includes(q) : false;
+    const matchNip = e.nip ? String(e.nip).toLowerCase().includes(q) : false;
+    return matchName || matchNip;
+  });
 
   return (
     <div className="space-y-5">
@@ -154,6 +164,25 @@ export default function ManajemenRegu() {
             )}
           </div>
           <div className="flex flex-wrap items-center gap-2">
+            <div className="relative w-48 sm:w-60">
+              <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400 pointer-events-none" />
+              <Input
+                placeholder="Cari nama atau NIP..."
+                value={memberSearch}
+                onChange={(e) => setMemberSearch(e.target.value)}
+                className="h-8 pl-8 pr-7 bg-white text-xs"
+                data-testid="search-team-members"
+              />
+              {memberSearch && (
+                <button
+                  type="button"
+                  onClick={() => setMemberSearch("")}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              )}
+            </div>
             <Badge className="gap-1.5 bg-amber-100 text-amber-700 hover:bg-amber-100">
               <Crown className="h-3.5 w-3.5" /> Komandan: {detail?.commander?.nama || "—"}
             </Badge>
@@ -170,6 +199,8 @@ export default function ManajemenRegu() {
         </div>
         {loading ? <TableSkeleton rows={8} columns={5} /> : (detail?.members?.length || 0) === 0 ? (
           <p className="py-16 text-center text-slate-400">Belum ada anggota di regu ini.</p>
+        ) : filteredMembers.length === 0 ? (
+          <p className="py-12 text-center text-slate-400">Tidak ada anggota yang cocok dengan pencarian "{memberSearch}".</p>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
@@ -183,7 +214,7 @@ export default function ManajemenRegu() {
                 </tr>
               </thead>
               <tbody>
-                {detail.members.map((e) => (
+                {filteredMembers.map((e: any) => (
                   <tr key={e.id} className="border-b border-slate-100 hover:bg-slate-50" data-testid={`member-row-${e.id}`}>
                     <td className="px-3 py-2.5 text-slate-400">{e.no}</td>
                     <td className="px-3 py-2.5 font-semibold text-slate-800">{e.nama} {e.is_commander && <span title="Komandan Regu">⭐</span>}</td>
@@ -211,12 +242,13 @@ export default function ManajemenRegu() {
             <div className="space-y-3">
               <div className="space-y-1.5">
                 <Label>Pegawai</Label>
-                <Select value={roll.employee_id} onValueChange={(v) => setRoll({ ...roll, employee_id: v })}>
-                  <SelectTrigger data-testid="roll-employee"><SelectValue placeholder="Pilih pegawai" /></SelectTrigger>
-                  <SelectContent className="max-h-64">
-                    {allEmp.map((e) => <SelectItem key={e.id} value={e.id}>{e.nama} {e.current_team_name ? `(${e.current_team_name})` : ""}</SelectItem>)}
-                  </SelectContent>
-                </Select>
+                <EmployeeSearchSelect
+                  value={roll.employee_id}
+                  onChange={(v) => setRoll({ ...roll, employee_id: v })}
+                  employees={allEmp}
+                  placeholder="Cari & pilih pegawai (nama atau NIP)..."
+                  data-testid="roll-employee"
+                />
               </div>
               <div className="space-y-1.5">
                 <Label>Pindah ke Regu</Label>
@@ -262,12 +294,13 @@ export default function ManajemenRegu() {
             <div className="space-y-3">
               <div className="space-y-1.5">
                 <Label>Komandan (anggota regu)</Label>
-                <Select value={cmd.employee_id} onValueChange={(v) => setCmd({ ...cmd, employee_id: v })}>
-                  <SelectTrigger data-testid="cmd-employee"><SelectValue placeholder="Pilih pegawai" /></SelectTrigger>
-                  <SelectContent className="max-h-64">
-                    {(detail?.members || []).map((e) => <SelectItem key={e.id} value={e.id}>{e.nama}</SelectItem>)}
-                  </SelectContent>
-                </Select>
+                <EmployeeSearchSelect
+                  value={cmd.employee_id}
+                  onChange={(v) => setCmd({ ...cmd, employee_id: v })}
+                  employees={detail?.members || []}
+                  placeholder="Cari & pilih komandan (nama atau NIP)..."
+                  data-testid="cmd-employee"
+                />
               </div>
               <div className="space-y-1.5">
                 <Label>Berlaku mulai</Label>
@@ -291,12 +324,13 @@ export default function ManajemenRegu() {
             <div className="space-y-3">
               <div className="space-y-1.5">
                 <Label>Pejabat</Label>
-                <Select value={ksForm.employee_id} onValueChange={(v) => setKsForm({ ...ksForm, employee_id: v })}>
-                  <SelectTrigger data-testid="ks-employee"><SelectValue placeholder="Pilih pegawai" /></SelectTrigger>
-                  <SelectContent className="max-h-64">
-                    {allEmp.map((e) => <SelectItem key={e.id} value={e.id}>{e.nama}</SelectItem>)}
-                  </SelectContent>
-                </Select>
+                <EmployeeSearchSelect
+                  value={ksForm.employee_id}
+                  onChange={(v) => setKsForm({ ...ksForm, employee_id: v })}
+                  employees={allEmp}
+                  placeholder="Cari & pilih pejabat (nama atau NIP)..."
+                  data-testid="ks-employee"
+                />
               </div>
               <div className="space-y-1.5">
                 <Label>Berlaku mulai</Label>
