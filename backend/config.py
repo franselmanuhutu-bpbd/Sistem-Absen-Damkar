@@ -19,6 +19,11 @@ DATABASE_URL = os.environ.get("POSTGRESQL_DATABASE_URL")
 JWT_SECRET = os.environ.get("JWT_SECRET")
 JWT_ALG = "HS256"
 
+# Web Push (VAPID) Settings
+VAPID_PUBLIC_KEY = os.environ.get("VAPID_PUBLIC_KEY", "BOqmEeXmOiAZZQHYR015T2DClxPb6HDHqD-ZRenoLxwhYgWrwKS9MzCOAbLJGRNwFp-t0HzTaotkwyEYS_yA9M8")
+VAPID_PRIVATE_KEY = os.environ.get("VAPID_PRIVATE_KEY", "ziQlouKeqqHfwbkhlJNQkyT_OMMDwO9o3p7J-_dT5NI")
+VAPID_CLAIM_EMAIL = os.environ.get("VAPID_CLAIM_EMAIL", "mailto:fransel.manuhutu@gmail.com")
+
 # System Constants
 STATUSES = ["HDR", "OFF", "SKT", "TK", "IZN", "DL"]
 STATUS_LABEL = {

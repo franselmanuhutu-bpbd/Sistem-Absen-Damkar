@@ -27,6 +27,14 @@ if (!result.success) {
   process.exit(1);
 }
 
+// Copy public files if present
+const publicSw = path.join(process.cwd(), "public", "sw.js");
+const distSw = path.join(outdir, "sw.js");
+if (await Bun.file(publicSw).exists()) {
+  await Bun.write(distSw, Bun.file(publicSw));
+  console.log("  Copied public/sw.js to dist/sw.js");
+}
+
 console.log("Build successful:");
 for (const output of result.outputs) {
   console.log(`  ${path.relative(process.cwd(), output.path)}  ${(output.size / 1024).toFixed(1)} KB`);

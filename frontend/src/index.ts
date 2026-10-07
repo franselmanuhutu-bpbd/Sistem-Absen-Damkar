@@ -18,6 +18,23 @@ const server = serve({
       });
     },
 
+    // Service worker
+    "/sw.js": async () => {
+      const file = Bun.file("public/sw.js");
+      if (await file.exists()) {
+        return new Response(file, {
+          headers: {
+            "Content-Type": "application/javascript",
+            "Service-Worker-Allowed": "/",
+            "Cache-Control": "no-cache, no-store, must-revalidate",
+          },
+        });
+      }
+      return new Response("console.log('SW not found');", {
+        headers: { "Content-Type": "application/javascript" },
+      });
+    },
+
     // SPA fallback: serve index.html for all other routes
     "/*": index,
   },

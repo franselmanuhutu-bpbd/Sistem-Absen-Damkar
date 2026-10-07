@@ -18,6 +18,7 @@ from routers import (
     me,
     audit,
     exports,
+    notifications,
 )
 
 
@@ -67,6 +68,7 @@ api.include_router(kasubid.router)
 api.include_router(me.router)
 api.include_router(audit.router)
 api.include_router(exports.router)
+api.include_router(notifications.router)
 
 # Mount /api router and root
 app.include_router(api)

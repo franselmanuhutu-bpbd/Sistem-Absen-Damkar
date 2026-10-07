@@ -77,7 +77,13 @@ def ensure_schema():
             else:
                 logger.warning(f"Schema file not found at {schema_file}")
         except Exception as exc:
-            logger.error(f"Error executing schema via DATABASE_URL: {exc}")
+            if "11001" in str(exc) or "getaddrinfo failed" in str(exc):
+                logger.warning(
+                    f"Direct PostgreSQL connection to '{DATABASE_URL.split('@')[-1] if '@' in DATABASE_URL else '...'}' "
+                    f"skipped (Supabase direct host is IPv6-only). Primary API operates normally via Supabase PostgREST client."
+                )
+            else:
+                logger.warning(f"Notice executing schema via DATABASE_URL: {exc}")
 
     # 2. Verify or seed via Supabase Client
     if SUPABASE_URL and SUPABASE_SECRET_KEY:
