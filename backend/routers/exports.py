@@ -42,9 +42,12 @@ async def export_excel(
     thin = Side(style="thin", color="94A3B8")
     border = Border(left=thin, right=thin, top=thin, bottom=thin)
     header_fill = PatternFill("solid", fgColor="0F172A")
-    header_font = Font(bold=True, color="FFFFFF")
-    title_font = Font(bold=True, size=14, color="0F172A")
+    header_font = Font(bold=True, size=10, color="FFFFFF")
+    title_font = Font(bold=True, size=13, color="0F172A")
     center = Alignment(horizontal="center", vertical="center", wrap_text=True)
+    left_center = Alignment(horizontal="left", vertical="center", wrap_text=True)
+    data_font = Font(size=10)
+    data_font_bold = Font(size=10, bold=True)
 
     def style_header(ws, row, ncols):
         for c in range(1, ncols + 1):
@@ -70,10 +73,10 @@ async def export_excel(
     ws.cell(row=1, column=1, value=f"{KOP['l1']} {KOP['l2']} \u2014 {KOP['l3']}").font = title_font
     ws.cell(row=1, column=1).alignment = center
     ws.merge_cells(start_row=2, start_column=1, end_row=2, end_column=len(cols))
-    ws.cell(row=2, column=1, value="REKAPITULASI ABSENSI PEGAWAI").font = Font(bold=True, size=12)
+    ws.cell(row=2, column=1, value="REKAPITULASI ABSENSI PEGAWAI").font = Font(bold=True, size=11)
     ws.cell(row=2, column=1).alignment = center
     ws.merge_cells(start_row=3, start_column=1, end_row=3, end_column=len(cols))
-    ws.cell(row=3, column=1, value=f"Periode: {data['period_label']}   |   Dicetak: {datetime.now().strftime('%d-%m-%Y %H:%M')}")
+    ws.cell(row=3, column=1, value=f"Periode: {data['period_label']}   |   Dicetak: {datetime.now().strftime('%d-%m-%Y %H:%M')}").font = Font(size=10)
     ws.cell(row=3, column=1).alignment = center
 
     hr = 5
@@ -86,21 +89,34 @@ async def export_excel(
         for i, v in enumerate(vals, 1):
             cell = ws.cell(row=r, column=i, value=v)
             cell.border = border
-            if 7 <= i <= 12:
+            cell.font = data_font
+            if i == 3:  # Nama: Left Center
+                cell.alignment = left_center
+            else:       # Other: Middle
                 cell.alignment = center
+            if 7 <= i <= 12:
                 cell.fill = PatternFill("solid", fgColor=STATUS_HEX[STATUSES[i - 7]])
-                cell.font = Font(color="FFFFFF", bold=True)
+                cell.font = Font(size=10, color="FFFFFF", bold=True)
+            elif i in (len(vals) - 1, len(vals)):
+                cell.font = data_font_bold
         r += 1
 
-    ws.cell(row=r, column=1, value="TOTAL").font = Font(bold=True)
+    ws.cell(row=r, column=1, value="TOTAL").font = data_font_bold
+    ws.cell(row=r, column=1).alignment = center
     ws.merge_cells(start_row=r, start_column=1, end_row=r, end_column=6)
     for i, s in enumerate(STATUSES):
         cell = ws.cell(row=r, column=7 + i, value=data["grand_total"][s])
-        cell.font = Font(bold=True)
+        cell.font = data_font_bold
         cell.alignment = center
         cell.border = border
-    ws.cell(row=r, column=len(cols) - 1, value=sum(row["jumlah_hari_kerja"] for row in data["rows"])).font = Font(bold=True)
-    ws.cell(row=r, column=len(cols), value=data["grand_total"]["HDR"]).font = Font(bold=True)
+    cell_jhk = ws.cell(row=r, column=len(cols) - 1, value=sum(row["jumlah_hari_kerja"] for row in data["rows"]))
+    cell_jhk.font = data_font_bold
+    cell_jhk.alignment = center
+    cell_jhk.border = border
+    cell_hdr = ws.cell(row=r, column=len(cols), value=data["grand_total"]["HDR"])
+    cell_hdr.font = data_font_bold
+    cell_hdr.alignment = center
+    cell_hdr.border = border
     autofit(ws, len(cols), hr)
     ws.freeze_panes = ws.cell(row=hr + 1, column=1)
     ws.auto_filter.ref = f"A{hr}:{get_column_letter(len(cols))}{hr}"
@@ -117,13 +133,16 @@ async def export_excel(
             for i, v in enumerate(vals, 1):
                 c = wb2.cell(row=rr, column=i, value=v)
                 c.border = border
+                c.font = data_font
+                if i == 2:  # Nama: Left Center
+                    c.alignment = left_center
+                else:       # Other: Middle
+                    c.alignment = center
                 if 5 <= i <= 10:
-                    c.alignment = center
                     c.fill = PatternFill("solid", fgColor=STATUS_HEX[STATUSES[i - 5]])
-                    c.font = Font(color="FFFFFF", bold=True)
+                    c.font = Font(size=10, color="FFFFFF", bold=True)
                 elif 11 <= i <= 12:
-                    c.alignment = center
-                    c.font = Font(bold=True)
+                    c.font = data_font_bold
             rr += 1
         autofit(wb2, len(bcols))
         wb2.freeze_panes = "E2"
@@ -156,10 +175,14 @@ async def export_excel(
             for i, v in enumerate(vals, 1):
                 c = wb3.cell(row=rr, column=i, value=v)
                 c.border = border
+                c.font = data_font
+                if i == 3:  # Nama: Left Center
+                    c.alignment = left_center
+                else:       # Other: Middle
+                    c.alignment = center
                 if i == 5:
                     c.fill = PatternFill("solid", fgColor=STATUS_HEX.get(rec["status"], "FFFFFF"))
-                    c.font = Font(color="FFFFFF", bold=True)
-                    c.alignment = center
+                    c.font = Font(size=10, color="FFFFFF", bold=True)
             rr += 1
         autofit(wb3, len(dcols))
         wb3.freeze_panes = "A2"
@@ -194,7 +217,7 @@ async def export_pdf(
         Paragraph, Spacer
     )
     from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-    from reportlab.lib.enums import TA_CENTER
+    from reportlab.lib.enums import TA_CENTER, TA_LEFT
 
     data = await _compute_recap(start, end, team_id or None, category or None)
     buf = io.BytesIO()
@@ -225,50 +248,65 @@ async def export_pdf(
 
     styles = getSampleStyleSheet()
     title_style = ParagraphStyle("t", parent=styles["Title"], fontSize=13, alignment=TA_CENTER, spaceAfter=2)
-    sub_style = ParagraphStyle("s", parent=styles["Normal"], fontSize=10, alignment=TA_CENTER, spaceAfter=2)
-    sec_style = ParagraphStyle("sec", parent=styles["Heading2"], fontSize=11, textColor=colors.HexColor("#0F172A"), spaceBefore=8, spaceAfter=4)
+    sub_style = ParagraphStyle("s", parent=styles["Normal"], fontSize=9, alignment=TA_CENTER, spaceAfter=2)
+    sec_style = ParagraphStyle("sec", parent=styles["Heading2"], fontSize=10, textColor=colors.HexColor("#0F172A"), spaceBefore=8, spaceAfter=4)
     
+    CELL_FONT_SIZE = 7
+    CELL_LEADING = 8.5
+
     table_header_style = ParagraphStyle(
         "table_header",
         parent=styles["Normal"],
         fontName="Helvetica-Bold",
-        fontSize=6.5,
-        leading=7.5,
+        fontSize=CELL_FONT_SIZE,
+        leading=CELL_LEADING,
         alignment=TA_CENTER,
         textColor=colors.white,
+        wordWrap="LTR",
     )
-
-    table_cell_style = ParagraphStyle(
-        "table_cell",
-        parent=styles["Normal"],
-        fontName="Helvetica",
-        fontSize=6.5,
-        leading=7.5,
-        wordWrap="LTR", # Full word boundaries
-    )
-
-    elements = []
-    elements.append(Paragraph("REKAPITULASI ABSENSI PEGAWAI", title_style))
-    elements.append(Paragraph(f"Periode: {data['period_label']}", sub_style))
-    elements.append(Spacer(1, 6))
-
-    status_colors = {s: colors.HexColor("#" + STATUS_HEX[s]) for s in STATUSES}
 
     table_cell_center_style = ParagraphStyle(
-        f"tabel_center",
-        parent=table_cell_style,
-        textColor=colors.black,
-        fontName="Helvetica-Bold",
+        "table_cell_center",
+        parent=styles["Normal"],
+        fontName="Helvetica",
+        fontSize=CELL_FONT_SIZE,
+        leading=CELL_LEADING,
         alignment=TA_CENTER,
+        wordWrap="LTR",
     )
+
+    table_cell_center_bold = ParagraphStyle(
+        "table_cell_center_bold",
+        parent=styles["Normal"],
+        fontName="Helvetica-Bold",
+        fontSize=CELL_FONT_SIZE,
+        leading=CELL_LEADING,
+        alignment=TA_CENTER,
+        wordWrap="LTR",
+    )
+
+    table_cell_nama_style = ParagraphStyle(
+        "table_cell_nama",
+        parent=styles["Normal"],
+        fontName="Helvetica-Bold",
+        fontSize=CELL_FONT_SIZE,
+        leading=CELL_LEADING,
+        alignment=TA_LEFT,
+        wordWrap="LTR",
+    )
+
+    status_colors = {s: colors.HexColor("#" + STATUS_HEX[s]) for s in STATUSES}
 
     status_cell_styles = {
         s: ParagraphStyle(
             f"table_status_{s}",
-            parent=table_cell_style,
+            parent=styles["Normal"],
             textColor=status_colors[s],
             fontName="Helvetica-Bold",
+            fontSize=CELL_FONT_SIZE,
+            leading=CELL_LEADING,
             alignment=TA_CENTER,
+            wordWrap="LTR",
         )
         for s in STATUSES
     }
@@ -276,20 +314,24 @@ async def export_pdf(
     def format_regu(value):
         return str(value).replace(" - ", "<br/>")
 
+    elements = []
+    elements.append(Paragraph("REKAPITULASI ABSENSI PEGAWAI", title_style))
+    elements.append(Paragraph(f"Periode: {data['period_label']}", sub_style))
+    elements.append(Spacer(1, 6))
+
     if include_summary:
         elements.append(Paragraph("RINGKASAN PERIODE", sec_style))
         gt = data["grand_total"]
-        sum_data = [["Total Pegawai"] + [STATUS_LABEL[s] for s in STATUSES] + ["Total Kehadiran"],
-                    [data["total_pegawai"]] + [gt[s] for s in STATUSES] + [gt["HDR"]]]
-        st = Table(sum_data, repeatRows=1)
+        sum_header = [Paragraph("Total Pegawai", table_header_style)] + [Paragraph(STATUS_LABEL[s], table_header_style) for s in STATUSES] + [Paragraph("Total Kehadiran", table_header_style)]
+        sum_row = [Paragraph(str(data["total_pegawai"]), table_cell_center_bold)] + [Paragraph(str(gt[s]), table_cell_center_bold) for s in STATUSES] + [Paragraph(str(gt["HDR"]), table_cell_center_bold)]
+        st = Table([sum_header, sum_row], repeatRows=1)
         st.setStyle(TableStyle([
             ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#94A3B8")),
             ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#0F172A")),
-            ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
-            ("FONTNAME", (0, 0), (-1, -1), "Helvetica-Bold"),
-            ("FONTSIZE", (0, 0), (-1, -1), 8),
             ("ALIGN", (0, 0), (-1, -1), "CENTER"),
             ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+            ("TOPPADDING", (0, 0), (-1, -1), 3),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
         ]))
         elements.append(st)
         elements.append(Spacer(1, 8))
@@ -301,7 +343,7 @@ async def export_pdf(
             cells = [
                 Paragraph(str(row["no"]), table_cell_center_style),
                 Paragraph(str(row["nip"]), table_cell_center_style),
-                Paragraph(str(row["nama"]), table_cell_center_style),
+                Paragraph(str(row["nama"]), table_cell_nama_style),
                 Paragraph(format_regu(row["regu"]), table_cell_center_style),
                 Paragraph(str(row["category"]), table_cell_center_style),
                 Paragraph(str(row["jabatan"]), table_cell_center_style),
@@ -311,44 +353,41 @@ async def export_pdf(
                 for s in STATUSES
             ]
             cells += [
-                Paragraph(str(row["jumlah_hari_kerja"]), table_cell_center_style),
-                Paragraph(str(row["total_kehadiran"]), table_cell_center_style),
+                Paragraph(str(row["jumlah_hari_kerja"]), table_cell_center_bold),
+                Paragraph(str(row["total_kehadiran"]), table_cell_center_bold),
             ]
             table_data.append(cells)
 
         # Bottom of the Table (==== TOTAL ====)
         total_row = [
-            Paragraph("TOTAL", table_cell_center_style), "", "", "", "", ""
+            Paragraph("TOTAL", table_cell_center_bold), "", "", "", "", ""
         ] + [
-            Paragraph(str(data["grand_total"][s]), table_cell_center_style)
+            Paragraph(str(data["grand_total"][s]), table_cell_center_bold)
             for s in STATUSES
         ] + [
-            Paragraph(str(sum(row["jumlah_hari_kerja"] for row in data["rows"])), table_cell_center_style),
-            Paragraph(str(data["grand_total"]["HDR"]), table_cell_center_style),
+            Paragraph(str(sum(row["jumlah_hari_kerja"] for row in data["rows"])), table_cell_center_bold),
+            Paragraph(str(data["grand_total"]["HDR"]), table_cell_center_bold),
         ]
         table_data.append(total_row)
         
-        colw = [8 * mm, 28 * mm, 40 * mm, 19 * mm, 21 * mm, 40 * mm] + [11 * mm] * 6 + [20 * mm, 20 * mm]
+        colw = [8 * mm, 28 * mm, 42 * mm, 20 * mm, 20 * mm, 38 * mm] + [11 * mm] * 6 + [20 * mm, 20 * mm]
         t = Table(table_data, colWidths=colw, repeatRows=1)
         ts = [
             ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#94A3B8")),
             ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#0F172A")),
             ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
-            ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
             ("LEFTPADDING", (0, 0), (-1, -1), 2),
             ("RIGHTPADDING", (0, 0), (-1, -1), 2),
-            ("TOPPADDING", (0, 0), (-1, -1), 3.5),
-            ("BOTTOMPADDING", (0, 0), (-1, -1), 3.5),
-            ("ALIGN", (4, 0), (-1, -1), "CENTER"),
-            ("ALIGN", (0, 0), (0, -1), "CENTER"),
+            ("TOPPADDING", (0, 0), (-1, -1), 3),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
+            ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+            ("ALIGN", (2, 1), (2, -2), "LEFT"),
             ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
             ("BACKGROUND", (0, -1), (-1, -1), colors.HexColor("#E2E8F0")),
-            ("FONTNAME", (0, -1), (-1, -1), "Helvetica-Bold"),
             ("SPAN", (0, -1), (5, -1)),
         ]
         for i, s in enumerate(STATUSES):
             ts.append(("TEXTCOLOR", (6 + i, 1), (6 + i, -2), status_colors[s]))
-            ts.append(("FONTNAME", (6 + i, 1), (6 + i, -2), "Helvetica-Bold"))
         t.setStyle(TableStyle(ts))
         elements.append(t)
 
@@ -359,7 +398,7 @@ async def export_pdf(
         for b in data["breakdown"]:
             cells = [
                 Paragraph(str(b["no"]), table_cell_center_style),
-                Paragraph(str(b["nama"]), styles["BodyText"]),
+                Paragraph(str(b["nama"]), table_cell_nama_style),
                 Paragraph(format_regu(b["regu"]), table_cell_center_style),
                 Paragraph(str(b["month_label"]), table_cell_center_style),
             ]
@@ -368,28 +407,26 @@ async def export_pdf(
                 for s in STATUSES
             ]
             cells += [
-                Paragraph(str(b["jumlah_hari_kerja"]), table_cell_center_style),
-                Paragraph(str(b["total_kehadiran"]), table_cell_center_style),
+                Paragraph(str(b["jumlah_hari_kerja"]), table_cell_center_bold),
+                Paragraph(str(b["total_kehadiran"]), table_cell_center_bold),
             ]
             bd.append(cells)
-        colw = [8 * mm, 52 * mm, 26 * mm, 30 * mm] + [13 * mm] * 6 + [24 * mm, 22 * mm]
+        colw = [8 * mm, 56 * mm, 26 * mm, 30 * mm] + [13 * mm] * 6 + [20 * mm, 20 * mm]
         t = Table(bd, colWidths=colw, repeatRows=1)
         ts = [
             ("GRID", (0, 0), (-1, -1), 0.4, colors.HexColor("#94A3B8")),
             ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#1E293B")),
             ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
-            ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-            ("FONTSIZE", (0, 0), (-1, -1), 7),
             ("LEFTPADDING", (0, 0), (-1, -1), 2),
             ("RIGHTPADDING", (0, 0), (-1, -1), 2),
             ("TOPPADDING", (0, 0), (-1, -1), 3),
             ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
             ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+            ("ALIGN", (1, 1), (1, -1), "LEFT"),
             ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
         ]
         for i, s in enumerate(STATUSES):
             ts.append(("TEXTCOLOR", (4 + i, 1), (4 + i, -1), status_colors[s]))
-            ts.append(("FONTNAME", (4 + i, 1), (4 + i, -1), "Helvetica-Bold"))
         t.setStyle(TableStyle(ts))
         elements.append(t)
 
@@ -403,23 +440,30 @@ async def export_pdf(
         records = await fetch_all(q)
         emps = {e["id"]: e for e in ((await db.table("employees").select("*").execute()).data or [])}
         teams = {t["id"]: t for t in ((await db.table("teams").select("*").execute()).data or [])}
-        dh = [["Tanggal", "NIP", "Nama", "Regu", "Status"]]
+        dh_header = ["Tanggal", "NIP", "Nama", "Regu", "Status"]
+        dh = [[Paragraph(str(value), table_header_style) for value in dh_header]]
         for rec in records:
             if team_id and rec.get("team_id") != team_id:
                 continue
             e = emps.get(rec["employee_id"], {})
             dh.append([
-                rec["date"], e.get("nip"), Paragraph(str(e.get("nama")), styles["BodyText"]),
-                teams.get(rec.get("team_id"), {}).get("name"), rec["status"]
+                Paragraph(str(rec["date"]), table_cell_center_style),
+                Paragraph(str(e.get("nip") or "-"), table_cell_center_style),
+                Paragraph(str(e.get("nama") or "-"), table_cell_nama_style),
+                Paragraph(str(teams.get(rec.get("team_id"), {}).get("name") or "-"), table_cell_center_style),
+                Paragraph(str(rec["status"]), status_cell_styles.get(rec["status"], table_cell_center_bold)),
             ])
-        t = Table(dh, colWidths=[24 * mm, 36 * mm, 70 * mm, 25 * mm, 20 * mm], repeatRows=1)
+        t = Table(dh, colWidths=[26 * mm, 36 * mm, 70 * mm, 30 * mm, 20 * mm], repeatRows=1)
         t.setStyle(TableStyle([
             ("GRID", (0, 0), (-1, -1), 0.4, colors.HexColor("#94A3B8")),
             ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#0F172A")),
             ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
-            ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-            ("FONTSIZE", (0, 0), (-1, -1), 7),
-            ("ALIGN", (4, 0), (4, -1), "CENTER"),
+            ("LEFTPADDING", (0, 0), (-1, -1), 2),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 2),
+            ("TOPPADDING", (0, 0), (-1, -1), 3),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
+            ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+            ("ALIGN", (2, 1), (2, -1), "LEFT"),
             ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
         ]))
         elements.append(t)
@@ -448,8 +492,11 @@ async def export_kasubid_excel(
     thin = Side(style="thin", color="94A3B8")
     border = Border(left=thin, right=thin, top=thin, bottom=thin)
     hf = PatternFill("solid", fgColor="0F172A")
-    hfont = Font(bold=True, color="FFFFFF")
-    center = Alignment(horizontal="center", vertical="center")
+    hfont = Font(bold=True, size=10, color="FFFFFF")
+    center = Alignment(horizontal="center", vertical="center", wrap_text=True)
+    left_center = Alignment(horizontal="left", vertical="center", wrap_text=True)
+    data_font = Font(size=10)
+    data_font_bold = Font(size=10, bold=True)
 
     def head(ws, cols, row=1):
         for i, c in enumerate(cols, 1):
@@ -469,17 +516,19 @@ async def export_kasubid_excel(
         for j, v in enumerate(vals, 1):
             c = ws.cell(row=r, column=j, value=v)
             c.border = border
+            c.font = data_font
+            if j == 2:  # Nama: Left Center
+                c.alignment = left_center
+            else:       # Other: Middle
+                c.alignment = center
             if 4 <= j <= 9:
-                c.alignment = center
                 c.fill = PatternFill("solid", fgColor=STATUS_HEX[STATUSES[j - 4]])
-                c.font = Font(color="FFFFFF", bold=True)
-            elif j in (1, 10, 11):
-                c.alignment = center
-                if j in (10, 11):
-                    c.font = Font(bold=True)
+                c.font = Font(size=10, color="FFFFFF", bold=True)
+            elif j in (10, 11):
+                c.font = data_font_bold
         r += 1
 
-    ws.cell(row=r, column=1, value="TOTAL").font = Font(bold=True)
+    ws.cell(row=r, column=1, value="TOTAL").font = data_font_bold
     ws.cell(row=r, column=1).alignment = center
     ws.cell(row=r, column=1).border = border
     ws.merge_cells(start_row=r, start_column=1, end_row=r, end_column=3)
@@ -487,15 +536,15 @@ async def export_kasubid_excel(
         ws.cell(row=r, column=j).border = border
     for j, s in enumerate(STATUSES, 4):
         c = ws.cell(row=r, column=j, value=sum(p[s] for p in data["positions"]))
-        c.font = Font(bold=True)
+        c.font = data_font_bold
         c.alignment = center
         c.border = border
     c_jhk = ws.cell(row=r, column=10, value=sum(p["jumlah_hari_kerja"] for p in data["positions"]))
-    c_jhk.font = Font(bold=True)
+    c_jhk.font = data_font_bold
     c_jhk.alignment = center
     c_jhk.border = border
     c_hdr = ws.cell(row=r, column=11, value=sum(p["total_kehadiran"] for p in data["positions"]))
-    c_hdr.font = Font(bold=True)
+    c_hdr.font = data_font_bold
     c_hdr.alignment = center
     c_hdr.border = border
 
@@ -505,7 +554,7 @@ async def export_kasubid_excel(
     for col in ["D", "E", "F", "G", "H", "I"]:
         ws.column_dimensions[col].width = 12
     for col in ["J", "K"]:
-        ws.column_dimensions[col].width = 20
+        ws.column_dimensions[col].width = 18
 
     ws2 = wb.create_sheet("Detail Bulanan")
     bcols = ["Nama", "Posisi", "Bulan"] + STATUSES + ["Jumlah Hari Kerja", "Total Kehadiran"]
@@ -517,13 +566,16 @@ async def export_kasubid_excel(
             for j, v in enumerate(vals, 1):
                 c = ws2.cell(row=r, column=j, value=v)
                 c.border = border
+                c.font = data_font
+                if j == 1:  # Nama: Left Center
+                    c.alignment = left_center
+                else:       # Other: Middle
+                    c.alignment = center
                 if 4 <= j <= 9:
-                    c.alignment = center
                     c.fill = PatternFill("solid", fgColor=STATUS_HEX[STATUSES[j - 4]])
-                    c.font = Font(color="FFFFFF", bold=True)
+                    c.font = Font(size=10, color="FFFFFF", bold=True)
                 elif j >= 10:
-                    c.alignment = center
-                    c.font = Font(bold=True)
+                    c.font = data_font_bold
             r += 1
     ws2.column_dimensions["A"].width = 30
     ws2.column_dimensions["B"].width = 20
@@ -531,7 +583,7 @@ async def export_kasubid_excel(
     for col in ["D", "E", "F", "G", "H", "I"]:
         ws2.column_dimensions[col].width = 12
     for col in ["J", "K"]:
-        ws2.column_dimensions[col].width = 20
+        ws2.column_dimensions[col].width = 18
 
     ws3 = wb.create_sheet("Detail Harian")
     head(ws3, ["Tanggal", "Nama", "Posisi", "Status", "Keterangan"])
@@ -541,6 +593,14 @@ async def export_kasubid_excel(
         for j, v in enumerate(vals, 1):
             c = ws3.cell(row=r, column=j, value=v)
             c.border = border
+            c.font = data_font
+            if j == 2:  # Nama: Left Center
+                c.alignment = left_center
+            else:       # Other: Middle
+                c.alignment = center
+            if j == 4:
+                c.fill = PatternFill("solid", fgColor=STATUS_HEX.get(d["status"], "FFFFFF"))
+                c.font = Font(size=10, color="FFFFFF", bold=True)
         r += 1
     for col in "ABCDE":
         ws3.column_dimensions[col].width = 20
@@ -566,7 +626,7 @@ async def export_kasubid_pdf(
     from reportlab.lib import colors
     from reportlab.platypus import BaseDocTemplate, PageTemplate, Frame, Table, TableStyle, Paragraph, Spacer
     from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-    from reportlab.lib.enums import TA_CENTER
+    from reportlab.lib.enums import TA_CENTER, TA_LEFT
 
     data = await _compute_kasubid_recap(start, end)
     buf = io.BytesIO()
@@ -593,34 +653,51 @@ async def export_kasubid_pdf(
     doc.addPageTemplates([PageTemplate(id="m", frames=[frame], onPage=hf)])
     styles = getSampleStyleSheet()
     title = ParagraphStyle("t", parent=styles["Title"], fontSize=13, alignment=TA_CENTER)
-    sub = ParagraphStyle("s", parent=styles["Normal"], fontSize=10, alignment=TA_CENTER)
-    sec_style = ParagraphStyle("sec", parent=styles["Heading2"], fontSize=11, textColor=colors.HexColor("#0F172A"), spaceBefore=10, spaceAfter=4)
+    sub = ParagraphStyle("s", parent=styles["Normal"], fontSize=9, alignment=TA_CENTER)
+    sec_style = ParagraphStyle("sec", parent=styles["Heading2"], fontSize=10, textColor=colors.HexColor("#0F172A"), spaceBefore=10, spaceAfter=4)
     
+    CELL_FONT_SIZE = 7
+    CELL_LEADING = 8.5
+
     table_header_style = ParagraphStyle(
         "table_header",
         parent=styles["Normal"],
         fontName="Helvetica-Bold",
-        fontSize=7.5,
-        leading=9,
+        fontSize=CELL_FONT_SIZE,
+        leading=CELL_LEADING,
         alignment=TA_CENTER,
         textColor=colors.white,
-    )
-
-    table_cell_style = ParagraphStyle(
-        "table_cell",
-        parent=styles["Normal"],
-        fontName="Helvetica",
-        fontSize=7.5,
-        leading=9,
         wordWrap="LTR",
     )
 
     table_cell_center_style = ParagraphStyle(
-        "table_center",
-        parent=table_cell_style,
-        textColor=colors.black,
-        fontName="Helvetica-Bold",
+        "table_cell_center",
+        parent=styles["Normal"],
+        fontName="Helvetica",
+        fontSize=CELL_FONT_SIZE,
+        leading=CELL_LEADING,
         alignment=TA_CENTER,
+        wordWrap="LTR",
+    )
+
+    table_cell_center_bold = ParagraphStyle(
+        "table_cell_center_bold",
+        parent=styles["Normal"],
+        fontName="Helvetica-Bold",
+        fontSize=CELL_FONT_SIZE,
+        leading=CELL_LEADING,
+        alignment=TA_CENTER,
+        wordWrap="LTR",
+    )
+
+    table_cell_nama_style = ParagraphStyle(
+        "table_cell_nama",
+        parent=styles["Normal"],
+        fontName="Helvetica-Bold",
+        fontSize=CELL_FONT_SIZE,
+        leading=CELL_LEADING,
+        alignment=TA_LEFT,
+        wordWrap="LTR",
     )
 
     status_colors = {s: colors.HexColor("#" + STATUS_HEX[s]) for s in STATUSES}
@@ -628,10 +705,13 @@ async def export_kasubid_pdf(
     status_cell_styles = {
         s: ParagraphStyle(
             f"table_status_{s}",
-            parent=table_cell_style,
+            parent=styles["Normal"],
             textColor=status_colors[s],
             fontName="Helvetica-Bold",
+            fontSize=CELL_FONT_SIZE,
+            leading=CELL_LEADING,
             alignment=TA_CENTER,
+            wordWrap="LTR",
         )
         for s in STATUSES
     }
@@ -646,7 +726,7 @@ async def export_kasubid_pdf(
     for i, p in enumerate(data["positions"], 1):
         cells = [
             Paragraph(str(i), table_cell_center_style),
-            Paragraph(p["nama"], styles["BodyText"]),
+            Paragraph(p["nama"], table_cell_nama_style),
             Paragraph(p["label"], table_cell_center_style),
         ]
         cells += [
@@ -654,42 +734,40 @@ async def export_kasubid_pdf(
             for s in STATUSES
         ]
         cells += [
-            Paragraph(str(p["jumlah_hari_kerja"]), table_cell_center_style),
-            Paragraph(str(p["total_kehadiran"]), table_cell_center_style),
+            Paragraph(str(p["jumlah_hari_kerja"]), table_cell_center_bold),
+            Paragraph(str(p["total_kehadiran"]), table_cell_center_bold),
         ]
         td.append(cells)
 
     total_row = [
-        Paragraph("TOTAL", table_cell_center_style), "", ""
+        Paragraph("TOTAL", table_cell_center_bold), "", ""
     ] + [
-        Paragraph(str(sum(p[s] for p in data["positions"])), table_cell_center_style)
+        Paragraph(str(sum(p[s] for p in data["positions"])), table_cell_center_bold)
         for s in STATUSES
     ] + [
-        Paragraph(str(sum(p["jumlah_hari_kerja"] for p in data["positions"])), table_cell_center_style),
-        Paragraph(str(sum(p["total_kehadiran"] for p in data["positions"])), table_cell_center_style),
+        Paragraph(str(sum(p["jumlah_hari_kerja"] for p in data["positions"])), table_cell_center_bold),
+        Paragraph(str(sum(p["total_kehadiran"] for p in data["positions"])), table_cell_center_bold),
     ]
     td.append(total_row)
 
-    colw = [12 * mm, 68 * mm, 32 * mm] + [14 * mm] * 6 + [28 * mm, 25 * mm]
+    colw = [12 * mm, 75 * mm, 32 * mm] + [14 * mm] * 6 + [20 * mm, 20 * mm]
     t = Table(td, repeatRows=1, colWidths=colw)
     ts = [
         ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#94A3B8")),
         ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#0F172A")),
         ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
-        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
         ("LEFTPADDING", (0, 0), (-1, -1), 2),
         ("RIGHTPADDING", (0, 0), (-1, -1), 2),
-        ("TOPPADDING", (0, 0), (-1, -1), 3.5),
-        ("BOTTOMPADDING", (0, 0), (-1, -1), 3.5),
+        ("TOPPADDING", (0, 0), (-1, -1), 3),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
         ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+        ("ALIGN", (1, 1), (1, -2), "LEFT"),
         ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
         ("BACKGROUND", (0, -1), (-1, -1), colors.HexColor("#E2E8F0")),
-        ("FONTNAME", (0, -1), (-1, -1), "Helvetica-Bold"),
         ("SPAN", (0, -1), (2, -1)),
     ]
     for idx, s in enumerate(STATUSES):
         ts.append(("TEXTCOLOR", (3 + idx, 1), (3 + idx, -2), status_colors[s]))
-        ts.append(("FONTNAME", (3 + idx, 1), (3 + idx, -2), "Helvetica-Bold"))
     t.setStyle(TableStyle(ts))
     el.append(t)
 
@@ -701,33 +779,32 @@ async def export_kasubid_pdf(
         for p in data["positions"]:
             for mo in p["monthly"]:
                 b_cells = [
-                    Paragraph(p["nama"], styles["BodyText"]),
+                    Paragraph(p["nama"], table_cell_nama_style),
                     Paragraph(p["label"], table_cell_center_style),
                     Paragraph(mo["month_label"], table_cell_center_style),
                 ]
                 b_cells += [Paragraph(str(mo[s]), status_cell_styles[s]) for s in STATUSES]
                 b_cells += [
-                    Paragraph(str(mo["jumlah_hari_kerja"]), table_cell_center_style),
-                    Paragraph(str(mo["total_kehadiran"]), table_cell_center_style),
+                    Paragraph(str(mo["jumlah_hari_kerja"]), table_cell_center_bold),
+                    Paragraph(str(mo["total_kehadiran"]), table_cell_center_bold),
                 ]
                 b_td.append(b_cells)
-        b_colw = [60 * mm, 32 * mm, 28 * mm] + [14 * mm] * 6 + [26 * mm, 24 * mm]
+        b_colw = [70 * mm, 32 * mm, 28 * mm] + [14 * mm] * 6 + [20 * mm, 20 * mm]
         b_t = Table(b_td, repeatRows=1, colWidths=b_colw)
         b_ts = [
             ("GRID", (0, 0), (-1, -1), 0.4, colors.HexColor("#94A3B8")),
             ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#1E293B")),
             ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
-            ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
             ("LEFTPADDING", (0, 0), (-1, -1), 2),
             ("RIGHTPADDING", (0, 0), (-1, -1), 2),
             ("TOPPADDING", (0, 0), (-1, -1), 3),
             ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
-            ("ALIGN", (1, 0), (-1, -1), "CENTER"),
+            ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+            ("ALIGN", (0, 1), (0, -1), "LEFT"),
             ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
         ]
         for idx, s in enumerate(STATUSES):
             b_ts.append(("TEXTCOLOR", (3 + idx, 1), (3 + idx, -1), status_colors[s]))
-            b_ts.append(("FONTNAME", (3 + idx, 1), (3 + idx, -1), "Helvetica-Bold"))
         b_t.setStyle(TableStyle(b_ts))
         el.append(b_t)
 
