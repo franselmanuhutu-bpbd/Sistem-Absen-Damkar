@@ -29,6 +29,7 @@ import {
   subscribeToPush,
   unsubscribeFromPush,
 } from "@/lib/push";
+import JSZip from "jszip";
 
 function addMonths(ym: string, n: number) {
   let [y, m] = ym.split("-").map(Number);
@@ -60,6 +61,11 @@ export default function LaporanExport() {
   const [pushSubscribed, setPushSubscribed] = useState(false);
   const [pushLoading, setPushLoading] = useState(false);
   const [pushSupported, setPushSupported] = useState(true);
+  const [backupProgress, setBackupProgress] = useState<{
+    stage: string;
+    percent: number;
+    currentTable?: string;
+  } | null>(null);
 
   const isAdmin = Boolean(user && typeof user === "object" && user.role === "admin");
 
@@ -129,14 +135,112 @@ export default function LaporanExport() {
 
   const backup = async () => {
     setExp("backup");
+    const toastId = toast.loading("Menyiapkan proses backup database...");
+    setBackupProgress({ stage: "Menghubungi server untuk daftar tabel...", percent: 5 });
+
     try {
-      await downloadFile("/backup", {}, `backup_damkar_${Date.now()}.json`);
-      toast.success("Backup database berhasil diunduh");
+      // 1. Ambil daftar tabel yang tersedia dari backend
+      const tablesRes = await api.get("/backup/tables");
+      const tables: Array<{ name: string; label: string }> = tablesRes.data?.tables || [];
+      if (!tables.length) {
+        throw new Error("Daftar tabel database tidak ditemukan dari server.");
+      }
+
+      const zip = new JSZip();
+      let totalRecords = 0;
+      const metadata: Record<string, any> = {
+        generated_at: new Date().toISOString(),
+        backup_version: "2.0",
+        system: "Sistem Informasi Absensi DAMKAR Mimika",
+        tables: {},
+      };
+
+      // 2. Ambil data tiap tabel satu per satu dari backend
+      for (let i = 0; i < tables.length; i++) {
+        const table = tables[i];
+        const stepPercent = Math.round(5 + ((i + 0.5) / tables.length) * 80);
+        const statusMsg = `Mengambil data: ${table.label || table.name} (${i + 1}/${tables.length})...`;
+
+        toast.loading(statusMsg, { id: toastId });
+        setBackupProgress({
+          stage: statusMsg,
+          percent: stepPercent,
+          currentTable: table.name,
+        });
+
+        const tableRes = await api.get(`/backup/table/${table.name}`);
+        const rows = tableRes.data?.data || [];
+        totalRecords += rows.length;
+
+        // Simpan per tabel sebagai file JSON tersendiri yang terformat rapi
+        const jsonContent = JSON.stringify(rows, null, 2);
+        zip.file(`${table.name}.json`, jsonContent);
+
+        metadata.tables[table.name] = {
+          label: table.label,
+          records_count: rows.length,
+        };
+      }
+
+      metadata.total_tables = tables.length;
+      metadata.total_records = totalRecords;
+      zip.file("metadata.json", JSON.stringify(metadata, null, 2));
+
+      // 3. Kompresi ke file ZIP di browser
+      toast.loading("Mengompresi seluruh file JSON ke format ZIP...", { id: toastId });
+      setBackupProgress({ stage: "Mengompresi file ke ZIP...", percent: 90 });
+
+      const zipBlob = await zip.generateAsync(
+        {
+          type: "blob",
+          compression: "DEFLATE",
+          compressionOptions: { level: 6 },
+        },
+        (meta) => {
+          setBackupProgress({
+            stage: `Mengompresi ZIP (${Math.round(meta.percent)}%)...`,
+            percent: 88 + Math.round(meta.percent * 0.1),
+          });
+        }
+      );
+
+      // 4. Unduh file ZIP melalui browser
+      const now = new Date();
+      const datePart = now.toISOString().slice(0, 10);
+      const timePart = now.toTimeString().slice(0, 8).replace(/:/g, "");
+      const filename = `backup_damkar_${datePart}_${timePart}.zip`;
+
+      const downloadUrl = URL.createObjectURL(zipBlob);
+      const link = document.createElement("a");
+      link.href = downloadUrl;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(downloadUrl);
+
+      // 5. Catat log audit ke backend agar riwayat & pengingat backup terupdate
+      try {
+        await api.post("/backup/record-audit", {
+          total_tables: tables.length,
+          total_records: totalRecords,
+          filename,
+        });
+      } catch (err) {
+        console.warn("Audit record failed:", err);
+      }
+
+      toast.success(
+        `Backup selesai! ${tables.length} tabel (${totalRecords.toLocaleString("id-ID")} baris data) berhasil diunduh ke ${filename}`,
+        { id: toastId, duration: 6000 }
+      );
       await loadBackupStatus();
-    } catch (e) {
-      toast.error(apiError(e));
+    } catch (e: any) {
+      toast.error(apiError(e) || "Gagal melakukan backup database", { id: toastId });
+    } finally {
+      setBackupProgress(null);
+      setExp("");
     }
-    setExp("");
   };
 
   const togglePush = async () => {
@@ -388,6 +492,25 @@ export default function LaporanExport() {
                 </div>
               </div>
 
+              {/* Backup Progress indicator if in progress */}
+              {backupProgress && (
+                <div className="space-y-2 rounded-lg border border-amber-200 bg-amber-50/70 p-3 text-xs">
+                  <div className="flex items-center justify-between font-medium text-amber-900">
+                    <span className="flex items-center gap-1.5 truncate">
+                      <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-amber-600" />
+                      <span className="truncate">{backupProgress.stage}</span>
+                    </span>
+                    <span className="shrink-0 font-bold ml-2">{backupProgress.percent}%</span>
+                  </div>
+                  <div className="h-2 w-full overflow-hidden rounded-full bg-amber-200">
+                    <div
+                      className="h-full bg-amber-600 transition-all duration-300 rounded-full"
+                      style={{ width: `${backupProgress.percent}%` }}
+                    />
+                  </div>
+                </div>
+              )}
+
               <Button
                 onClick={backup}
                 disabled={!!exp}
@@ -395,8 +518,21 @@ export default function LaporanExport() {
                 className="w-full gap-2 border-slate-300 hover:bg-slate-100"
                 data-testid="backup-btn"
               >
-                {exp === "backup" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Database className="h-4 w-4" />} Backup Sekarang
+                {exp === "backup" ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin text-amber-600" />
+                    <span>Memproses Backup ({backupProgress?.percent ?? 0}%)...</span>
+                  </>
+                ) : (
+                  <>
+                    <Database className="h-4 w-4 text-slate-700" />
+                    <span>Backup Database (ZIP)</span>
+                  </>
+                )}
               </Button>
+              <p className="text-[11px] text-slate-400 text-center">
+                Mengekstrak setiap tabel sebagai file JSON individual dan mengompresi langsung ke file .zip di browser.
+              </p>
 
               {/* Web Push Notification Section */}
               <div className="border-t border-slate-100 pt-3 space-y-2.5">
