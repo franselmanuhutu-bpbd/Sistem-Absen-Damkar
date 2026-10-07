@@ -40,6 +40,13 @@ class AssignmentIn(BaseModel):
     end_date: Optional[str] = None
 
 
+class BatchAssignmentIn(BaseModel):
+    employee_ids: List[str]
+    team_id: str
+    start_date: str
+    end_date: Optional[str] = None
+
+
 class CommanderIn(BaseModel):
     team_id: str
     employee_id: str
