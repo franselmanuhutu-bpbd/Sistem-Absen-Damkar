@@ -203,17 +203,21 @@ async def _compute_recap(start_month: str, end_month: str, team_id: Optional[str
                 "team_id": tid, "regu": teams.get(tid, {}).get("name", "-"), "category": cat,
                 "month": mo, "month_label": _month_label(mo),
                 **cc, "total": sum(cc.values()),
+                "jumlah_hari_kerja": last_day_of_month(int(mo[:4]), int(mo[5:7])),
+                "total_kehadiran": cc["HDR"],
             })
     return {
         "months": months, "rows": rows, "breakdown": breakdown, "grand_total": grand,
         "total_pegawai": len(rows),
         "period_label": _period_label(start_month, end_month),
+        "jumlah_hari_kerja": jumlah_hari_kerja,
     }
 
 
 async def _compute_kasubid_recap(start_month: str, end_month: str):
     db = await get_db()
     months = month_range(start_month, end_month)
+    jumlah_hari_kerja = sum(last_day_of_month(int(m[:4]), int(m[5:7])) for m in months)
     sd = f"{start_month}-01"
     ey, em = int(end_month[:4]), int(end_month[5:7])
     ed = f"{end_month}-{last_day_of_month(ey, em):02d}"
@@ -267,11 +271,21 @@ async def _compute_kasubid_recap(start_month: str, end_month: str):
         positions.append({
             "position_id": pid, "label": label, "holders": holders,
             "nama": " / ".join(holders) if holders else "-",
-            **counts, "total": sum(counts.values()),
-            "monthly": [{"month": m, "month_label": _month_label(m), **monthly[m],
-                         "total": sum(monthly[m].values())} for m in months],
+            **counts,
+            "jumlah_hari_kerja": jumlah_hari_kerja,
+            "total_kehadiran": counts["HDR"],
+            "total": sum(counts.values()),
+            "monthly": [{
+                "month": m, "month_label": _month_label(m), **monthly[m],
+                "jumlah_hari_kerja": last_day_of_month(int(m[:4]), int(m[5:7])),
+                "total_kehadiran": monthly[m]["HDR"],
+                "total": sum(monthly[m].values()),
+            } for m in months],
         })
 
     detail.sort(key=lambda x: (x["position_id"], x["date"]), reverse=True)
-    return {"months": months, "positions": positions, "detail": detail,
-            "period_label": _period_label(start_month, end_month)}
+    return {
+        "months": months, "positions": positions, "detail": detail,
+        "period_label": _period_label(start_month, end_month),
+        "jumlah_hari_kerja": jumlah_hari_kerja,
+    }

@@ -44,10 +44,10 @@ export default function RekapBulanan() {
       if (type === "excel") {
         params.include_breakdown = false;
         params.include_detail = true;
-        await downloadFile("/export/excel", params, `Rekap_${month}.xlsx`);
+        await downloadFile("/export/excel", params, `Rekap_Bulanan_${month}.xlsx`);
       } else {
         params.include_summary = true;
-        await downloadFile("/export/pdf", params, `Rekap_${month}.pdf`);
+        await downloadFile("/export/pdf", params, `Rekap_Bulanan_${month}.pdf`);
       }
       toast.success("Laporan berhasil diunduh");
     } catch (e) { toast.error(apiError(e)); }

@@ -105,6 +105,10 @@ export default function RekapKasubid() {
                   <Skeleton key={j} className="h-14 rounded-lg" />
                 ))}
               </div>
+              <div className="mt-4 flex items-center justify-between border-t border-slate-100 pt-3">
+                <Skeleton className="h-4 w-36" />
+                <Skeleton className="h-4 w-32" />
+              </div>
             </Card>
           ))}
         </div>
@@ -133,7 +137,14 @@ export default function RekapKasubid() {
                   </div>
                 ))}
               </div>
-              <p className="mt-3 text-right text-sm text-slate-500">Total hari tercatat: <span className="font-bold text-slate-900">{p.total}</span></p>
+              <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 pt-3 text-sm">
+                <span className="text-slate-500">
+                  Jumlah Hari Kerja: <span className="font-bold text-slate-900">{p.jumlah_hari_kerja ?? data?.jumlah_hari_kerja ?? 0}</span>
+                </span>
+                <span className="text-slate-500">
+                  Total Kehadiran: <span className="font-bold text-slate-900">{p.total_kehadiran ?? p.HDR ?? 0}</span>
+                </span>
+              </div>
             </Card>
           ))}
         </div>

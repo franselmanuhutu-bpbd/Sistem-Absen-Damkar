@@ -62,10 +62,10 @@ export default function RekapPeriode() {
     try {
       if (type === "excel") {
         params.include_breakdown = true; params.include_detail = false;
-        await downloadFile("/export/excel", params, `Rekap_${start}_${end}.xlsx`);
+        await downloadFile("/export/excel", params, `Rekap_Periode_${start}_${end}.xlsx`);
       } else {
         params.include_summary = true; params.include_breakdown = true;
-        await downloadFile("/export/pdf", params, `Rekap_${start}_${end}.pdf`);
+        await downloadFile("/export/pdf", params, `Rekap_Periode_${start}_${end}.pdf`);
       }
       toast.success("Laporan berhasil diunduh");
     } catch (e) { toast.error(apiError(e)); }
@@ -230,7 +230,8 @@ export default function RekapPeriode() {
                       <th className="px-3 py-3">Regu</th>
                       <th className="px-3 py-3">Bulan</th>
                       {STATUSES.map((s) => <th key={s} className="px-2 py-3 text-center">{s}</th>)}
-                      <th className="px-3 py-3 text-center">Total</th>
+                      <th className="px-3 py-3 text-center">Jumlah Hari Kerja</th>
+                      <th className="px-3 py-3 text-center">Total Kehadiran</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -241,11 +242,12 @@ export default function RekapPeriode() {
                         <td className="px-3 py-2.5"><span className="rounded bg-red-50 px-2 py-0.5 text-xs font-semibold text-red-700">{b.regu}</span></td>
                         <td className="px-3 py-2.5 text-slate-500">{b.month_label}</td>
                         {STATUSES.map((s) => <td key={s} className="px-2 py-2.5 text-center font-semibold"><span className={b[s] > 0 ? STATUS_CONFIG[s].text : "text-slate-300"}>{b[s]}</span></td>)}
-                        <td className="px-3 py-2.5 text-center font-extrabold">{b.total}</td>
+                        <td className="px-3 py-2.5 text-center font-semibold text-slate-700">{b.jumlah_hari_kerja}</td>
+                        <td className="px-3 py-2.5 text-center font-extrabold text-slate-900">{b.total_kehadiran}</td>
                       </tr>
                     ))}
                     {(data?.breakdown || []).length === 0 && (
-                      <tr><td colSpan={11} className="py-10 text-center text-slate-400">Tidak ada data pada periode ini.</td></tr>
+                      <tr><td colSpan={12} className="py-10 text-center text-slate-400">Tidak ada data pada periode ini.</td></tr>
                     )}
                   </tbody>
                 </table>
