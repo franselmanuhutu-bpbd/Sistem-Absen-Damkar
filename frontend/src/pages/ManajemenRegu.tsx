@@ -333,12 +333,12 @@ export default function ManajemenRegu() {
 
   return (
     <div className="space-y-5">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-around">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 className="font-heading text-2xl font-bold text-slate-900">Struktur Organisasi &amp; Rolling</h2>
           <p className="text-sm text-slate-500">Kelola Kasubid, 6 regu, Komandan Regu, dan rolling pegawai berbasis periode.</p>
         </div>
-        <div className="flex flex-col gap-3 sm:flex-row sm:justify-between">
+        <div className="flex flex-col gap-3 sm:flex-row sm:justify-between items-end">
           <div className="flex items-center gap-2">
             <span className="text-xs font-semibold text-slate-600">Tanggal Acuan</span>
             <Input
