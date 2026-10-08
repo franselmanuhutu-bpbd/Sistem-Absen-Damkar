@@ -220,9 +220,8 @@ export default function AbsensiKasubid() {
                       key={e.id}
                       data-testid={`ks-roster-${e.id}`}
                       onClick={() => toggle(e.id)}
-                      className={`cursor-pointer border-b border-slate-100 transition-colors ${
-                        selected.has(e.id) ? "bg-amber-50/60" : isRowDirty ? "bg-amber-50/40" : "hover:bg-slate-50"
-                      }`}
+                      className={`cursor-pointer border-b border-slate-100 transition-colors ${selected.has(e.id) ? "bg-amber-50/60" : isRowDirty ? "bg-amber-50/40" : "hover:bg-slate-50"
+                        }`}
                     >
                       <td className="px-4 py-3" onClick={(ev) => ev.stopPropagation()}>
                         <Checkbox
@@ -251,11 +250,10 @@ export default function AbsensiKasubid() {
                                 onClick={() => handleSetRowStatus(e.id, s)}
                                 data-testid={`ks-status-opt-${e.id}-${s}`}
                                 title={`${s} — ${STATUS_CONFIG[s].label}`}
-                                className={`rounded px-2.5 py-1 text-xs font-bold transition-all cursor-pointer ${
-                                  isSelected
+                                className={`rounded px-2.5 py-1 text-xs font-bold transition-all cursor-pointer ${isSelected
                                     ? `${STATUS_CONFIG[s].btn} text-white shadow ring-2 ring-slate-900/20 scale-105`
                                     : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-                                }`}
+                                  }`}
                               >
                                 {s}
                               </button>
@@ -324,9 +322,6 @@ export default function AbsensiKasubid() {
               </Button>
             </div>
           </div>
-          <p className="mt-1.5 text-center text-[11px] text-slate-400">
-            {selected.size === 0 ? "Pilih pegawai di tabel untuk memilih sebagian, atau klik tombol status untuk menandai semua." : `${selected.size} Kasubid dipilih.`}
-          </p>
         </div>
       )}
     </div>
