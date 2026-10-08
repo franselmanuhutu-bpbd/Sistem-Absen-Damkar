@@ -5,12 +5,16 @@ import fs from "node:fs";
 const rootDir = path.resolve(import.meta.dir, "..");
 const keyPath = path.join(rootDir, "src-tauri", "damkar.key");
 
-if (!fs.existsSync(keyPath)) {
-  console.error("Error: Private key not found at", keyPath);
-  process.exit(1);
-}
+let privateKey = process.env.TAURI_SIGNING_PRIVATE_KEY?.trim();
 
-const privateKey = fs.readFileSync(keyPath, "utf-8").trim();
+if (!privateKey) {
+  if (fs.existsSync(keyPath)) {
+    privateKey = fs.readFileSync(keyPath, "utf-8").trim();
+  } else {
+    console.error("Error: Private key not found in env (TAURI_SIGNING_PRIVATE_KEY) or file at", keyPath);
+    process.exit(1);
+  }
+}
 
 const env = {
   ...process.env,
