@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { DatePicker } from "@/components/DatePicker";
 import { Users, Flame, Star, AlertCircle, ArrowRight, RefreshCw, Calendar, BarChart3 } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 
@@ -145,12 +146,11 @@ export default function Dashboard() {
         </div>
         <div className="flex items-center gap-2">
           <span className="text-sm font-medium text-slate-600">Tanggal</span>
-          <Input
-            type="date"
+          <DatePicker
             data-testid="dashboard-date"
             value={date || data?.date || ""}
-            onChange={(e) => setDate(e.target.value)}
-            className="h-10 w-44 bg-white cursor-pointer [&::-webkit-calendar-picker-indicator]:cursor-pointer"
+            onChange={(val) => setDate(val)}
+            className="w-64"
           />
         </div>
       </div>

@@ -15,6 +15,7 @@ import { TableSkeleton } from "@/components/ui/table-skeleton";
 import { EmployeeSearchSelect } from "@/components/EmployeeSearchSelect";
 import { cn } from "@/lib/utils";
 import { formatDateId } from "@/lib/constants";
+import { DatePicker } from "@/components/DatePicker";
 
 const today = new Date().toISOString().slice(0, 10);
 
@@ -408,12 +409,11 @@ export default function ManajemenRegu() {
         <div className="flex flex-col gap-3 sm:flex-row sm:justify-between items-end">
           <div className="flex items-center gap-2">
             <span className="text-xs font-semibold text-slate-600">Tanggal Acuan</span>
-            <Input
-              type="date"
+            <DatePicker
               data-testid="manajemen-regu-date"
               value={selectedDate}
-              onChange={(e) => setSelectedDate(e.target.value)}
-              className="h-9 w-40 bg-white cursor-pointer text-xs"
+              onChange={(val) => setSelectedDate(val)}
+              className="w-64"
             />
           </div>
           {isAdmin && (
@@ -495,12 +495,11 @@ export default function ManajemenRegu() {
                   </p>
                   {resetConfig.mode === "single" && (
                     <div className="pt-2 pl-4">
-                      <Label className="text-[11px] text-slate-600">Ubah Tanggal Target:</Label>
-                      <Input
-                        type="date"
+                      <Label className="text-[11px] text-slate-600 block mb-1">Ubah Tanggal Target:</Label>
+                      <DatePicker
                         value={resetConfig.date}
-                        onChange={(e) => setResetConfig((prev) => ({ ...prev, date: e.target.value }))}
-                        className="h-8 text-xs bg-white mt-1 w-44"
+                        onChange={(val) => setResetConfig((prev) => ({ ...prev, date: val }))}
+                        className="w-64"
                       />
                     </div>
                   )}
@@ -531,23 +530,21 @@ export default function ManajemenRegu() {
                     Mengosongkan penempatan regu yang berada di antara tanggal mulai dan tanggal akhir.
                   </p>
                   {resetConfig.mode === "range" && (
-                    <div className="grid grid-cols-2 gap-2 pt-2 pl-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-2 pl-4">
                       <div>
-                        <Label className="text-[11px] text-slate-600">Mulai:</Label>
-                        <Input
-                          type="date"
+                        <Label className="text-[11px] text-slate-600 block mb-1">Mulai:</Label>
+                        <DatePicker
                           value={resetConfig.start_date}
-                          onChange={(e) => setResetConfig((prev) => ({ ...prev, start_date: e.target.value }))}
-                          className="h-8 text-xs bg-white mt-1"
+                          onChange={(val) => setResetConfig((prev) => ({ ...prev, start_date: val }))}
+                          className="w-full"
                         />
                       </div>
                       <div>
-                        <Label className="text-[11px] text-slate-600">Sampai:</Label>
-                        <Input
-                          type="date"
+                        <Label className="text-[11px] text-slate-600 block mb-1">Sampai:</Label>
+                        <DatePicker
                           value={resetConfig.end_date}
-                          onChange={(e) => setResetConfig((prev) => ({ ...prev, end_date: e.target.value }))}
-                          className="h-8 text-xs bg-white mt-1"
+                          onChange={(val) => setResetConfig((prev) => ({ ...prev, end_date: val }))}
+                          className="w-full"
                         />
                       </div>
                     </div>
@@ -823,22 +820,20 @@ export default function ManajemenRegu() {
                   <div className="space-y-2 pt-1 border-t border-slate-200/60">
                     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                       <div className="space-y-1">
-                        <Label className="text-[11px] font-semibold text-slate-600">Tanggal Mulai Penempatan</Label>
-                        <Input
-                          type="date"
+                        <Label className="text-[11px] font-semibold text-slate-600 block">Tanggal Mulai Penempatan</Label>
+                        <DatePicker
                           value={roll.start_date}
-                          onChange={(e) => setRoll({ ...roll, start_date: e.target.value })}
+                          onChange={(val) => setRoll({ ...roll, start_date: val })}
                           data-testid="roll-date"
-                          className="h-8 bg-white cursor-pointer text-xs"
+                          className="w-full"
                         />
                       </div>
                       <div className="space-y-1">
-                        <Label className="text-[11px] font-semibold text-slate-600">Tanggal Selesai Penempatan</Label>
-                        <Input
-                          type="date"
-                          value={roll.end_date}
-                          onChange={(e) => setRoll({ ...roll, end_date: e.target.value })}
-                          className="h-8 bg-white cursor-pointer text-xs"
+                        <Label className="text-[11px] font-semibold text-slate-600 block">Tanggal Selesai Penempatan</Label>
+                        <DatePicker
+                          value={roll.end_date || ""}
+                          onChange={(val) => setRoll({ ...roll, end_date: val })}
+                          className="w-full"
                         />
                       </div>
                     </div>
@@ -887,18 +882,17 @@ export default function ManajemenRegu() {
                 )}
 
                 {roll.mode === "tunggal" && (
-                  <div className="border-t border-slate-200/60">
+                  <div className="border-t border-slate-200/60 pt-1">
                     <div className="sm:w-1/2 space-y-1">
-                      <Label className="text-[11px] font-semibold text-slate-600">Tanggal Penempatan (1 Hari Saja)</Label>
-                      <Input
-                        type="date"
+                      <Label className="text-[11px] font-semibold text-slate-600 block">Tanggal Penempatan (1 Hari Saja)</Label>
+                      <DatePicker
                         value={roll.start_date}
-                        onChange={(e) => setRoll({ ...roll, start_date: e.target.value })}
+                        onChange={(val) => setRoll({ ...roll, start_date: val })}
                         data-testid="roll-date"
-                        className="h-8 bg-white cursor-pointer text-xs"
+                        className="w-full"
                       />
                     </div>
-                    <p className="text-[11px] text-red-700 pt-3">
+                    <p className="text-[11px] text-red-700 pt-2">
                       Berlaku khusus tanggal <b>{formatDateId(roll.start_date)}</b>. Ideal untuk pergantian tugas harian tanpa mengubah jadwal sebelum/sesudahnya.
                     </p>
                   </div>
@@ -907,13 +901,12 @@ export default function ManajemenRegu() {
                 {roll.mode === "seterusnya" && (
                   <div className="pt-1 border-t border-slate-200/60">
                     <div className="sm:w-1/2 space-y-1">
-                      <Label className="text-[11px] font-semibold text-slate-600">Tanggal Mulai Penempatan</Label>
-                      <Input
-                        type="date"
+                      <Label className="text-[11px] font-semibold text-slate-600 block">Tanggal Mulai Penempatan</Label>
+                      <DatePicker
                         value={roll.start_date}
-                        onChange={(e) => setRoll({ ...roll, start_date: e.target.value })}
+                        onChange={(val) => setRoll({ ...roll, start_date: val })}
                         data-testid="roll-date"
-                        className="h-8 bg-white cursor-pointer text-xs"
+                        className="w-full"
                       />
                     </div>
                     <p className="text-[11px] text-slate-600 pt-1">
@@ -1198,7 +1191,12 @@ export default function ManajemenRegu() {
               </div>
               <div className="space-y-1.5">
                 <Label>Berlaku mulai</Label>
-                <Input type="date" value={cmd.start_date} onChange={(e) => setCmd({ ...cmd, start_date: e.target.value })} data-testid="cmd-date" />
+                <DatePicker
+                  value={cmd.start_date}
+                  onChange={(val) => setCmd({ ...cmd, start_date: val })}
+                  data-testid="cmd-date"
+                  className="w-full"
+                />
               </div>
               <p className="rounded-lg bg-amber-50 p-2.5 text-xs text-amber-700">Komandan lama tetap tercatat pada laporan periode sebelum tanggal ini.</p>
             </div>
@@ -1236,7 +1234,12 @@ export default function ManajemenRegu() {
               </div>
               <div className="space-y-1.5">
                 <Label>Berlaku mulai</Label>
-                <Input type="date" value={ksForm.start_date} onChange={(e) => setKsForm({ ...ksForm, start_date: e.target.value })} data-testid="ks-date" />
+                <DatePicker
+                  value={ksForm.start_date}
+                  onChange={(val) => setKsForm({ ...ksForm, start_date: val })}
+                  data-testid="ks-date"
+                  className="w-full"
+                />
               </div>
               <p className="rounded-lg bg-amber-50 p-2.5 text-xs text-amber-700">Pejabat lama tetap muncul pada laporan sebelum masa jabatan baru.</p>
             </div>

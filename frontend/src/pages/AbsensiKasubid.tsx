@@ -8,6 +8,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Star, Loader2, Info, Save, RotateCcw, CheckCheck, Square } from "lucide-react";
 import { toast } from "sonner";
 import { TableSkeleton } from "@/components/ui/table-skeleton";
+import { DatePicker } from "@/components/DatePicker";
 
 import { useNavigationGuard } from "@/context/NavigationGuardContext";
 
@@ -156,13 +157,12 @@ export default function AbsensiKasubid() {
           <p className="text-sm text-slate-500">Input absensi khusus pejabat Kasubid yang sedang aktif.</p>
         </div>
         <div className="flex items-center gap-2">
-          <label className="text-sm font-medium text-slate-600 shrink-0">Tanggal:</label>
-          <Input
-            type="date"
+          <label className="text-sm font-medium text-slate-600 shrink-0">Tanggal</label>
+          <DatePicker
             data-testid="ks-input-date"
             value={date}
-            onChange={(e) => handleDateChange(e.target.value)}
-            className="h-10 w-44 bg-white"
+            onChange={(val) => handleDateChange(val)}
+            className="w-64"
           />
         </div>
       </div>
@@ -251,8 +251,8 @@ export default function AbsensiKasubid() {
                                 data-testid={`ks-status-opt-${e.id}-${s}`}
                                 title={`${s} — ${STATUS_CONFIG[s].label}`}
                                 className={`rounded px-2.5 py-1 text-xs font-bold transition-all cursor-pointer ${isSelected
-                                    ? `${STATUS_CONFIG[s].btn} text-white shadow ring-2 ring-slate-900/20 scale-105`
-                                    : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                                  ? `${STATUS_CONFIG[s].btn} text-white shadow ring-2 ring-slate-900/20 scale-105`
+                                  : "bg-slate-100 text-slate-600 hover:bg-slate-200"
                                   }`}
                               >
                                 {s}

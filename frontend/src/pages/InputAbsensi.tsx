@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Loader2, CheckCheck, Square, Flame, Save, RotateCcw } from "lucide-react";
 import { toast } from "sonner";
 import { TableSkeleton } from "@/components/ui/table-skeleton";
+import { DatePicker } from "@/components/DatePicker";
 
 import { useNavigationGuard } from "@/context/NavigationGuardContext";
 
@@ -177,13 +178,12 @@ export default function InputAbsensi() {
           <p className="text-sm text-slate-500">Pilih tanggal &amp; regu, tentukan kehadiran staf, lalu simpan.</p>
         </div>
         <div className="flex items-center gap-2">
-          <label className="text-sm font-medium text-slate-600 shrink-0">Tanggal:</label>
-          <Input
-            type="date"
+          <label className="text-sm font-medium text-slate-600 shrink-0">Tanggal</label>
+          <DatePicker
             data-testid="input-date"
             value={date}
-            onChange={(e) => handleDateChange(e.target.value)}
-            className="h-10 w-44 bg-white"
+            onChange={(val) => handleDateChange(val)}
+            className="w-64"
           />
         </div>
       </div>
@@ -252,9 +252,8 @@ export default function InputAbsensi() {
                       key={e.id}
                       data-testid={`roster-row-${e.id}`}
                       onClick={() => toggle(e.id)}
-                      className={`cursor-pointer border-b border-slate-100 transition-colors ${
-                        selected.has(e.id) ? "bg-red-50/60" : isRowDirty ? "bg-amber-50/40" : "hover:bg-slate-50"
-                      }`}
+                      className={`cursor-pointer border-b border-slate-100 transition-colors ${selected.has(e.id) ? "bg-red-50/60" : isRowDirty ? "bg-amber-50/40" : "hover:bg-slate-50"
+                        }`}
                     >
                       <td className="px-4 py-3" onClick={(ev) => ev.stopPropagation()}>
                         <Checkbox
@@ -285,11 +284,10 @@ export default function InputAbsensi() {
                                 onClick={() => handleSetRowStatus(e.id, s)}
                                 data-testid={`status-opt-${e.id}-${s}`}
                                 title={`${s} — ${STATUS_CONFIG[s].label}`}
-                                className={`rounded px-2.5 py-1 text-xs font-bold transition-all cursor-pointer ${
-                                  isSelected
-                                    ? `${STATUS_CONFIG[s].btn} text-white shadow ring-2 ring-slate-900/20 scale-105`
-                                    : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-                                }`}
+                                className={`rounded px-2.5 py-1 text-xs font-bold transition-all cursor-pointer ${isSelected
+                                  ? `${STATUS_CONFIG[s].btn} text-white shadow ring-2 ring-slate-900/20 scale-105`
+                                  : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                                  }`}
                               >
                                 {s}
                               </button>

@@ -10,6 +10,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Star, UserPlus, UserMinus, History, Search, X, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { EmployeeSearchSelect } from "@/components/EmployeeSearchSelect";
+import { DatePicker } from "@/components/DatePicker";
 import { motion } from "framer-motion";
 
 const today = new Date().toISOString().slice(0, 10);
@@ -213,7 +214,12 @@ export default function PengaturanKasubid() {
               </div>
               <div className="space-y-1.5">
                 <Label>Berlaku mulai (tanggal pelantikan)</Label>
-                <Input type="date" value={setForm.start_date} onChange={(e) => setSetForm({ ...setForm, start_date: e.target.value })} data-testid="pk-date" />
+                <DatePicker
+                  value={setForm.start_date}
+                  onChange={(val) => setSetForm({ ...setForm, start_date: val })}
+                  data-testid="pk-date"
+                  className="w-full"
+                />
               </div>
               <p className="rounded-lg bg-amber-50 p-2.5 text-xs text-amber-700">Pejabat lama tetap tercatat pada absensi sebelum tanggal ini. Histori tidak berubah.</p>
             </div>
@@ -241,7 +247,12 @@ export default function PengaturanKasubid() {
             <div className="space-y-3">
               <div className="space-y-1.5">
                 <Label>Dikosongkan mulai tanggal</Label>
-                <Input type="date" value={vacForm.start_date} onChange={(e) => setVacForm({ ...vacForm, start_date: e.target.value })} data-testid="pk-vacate-date" />
+                <DatePicker
+                  value={vacForm.start_date}
+                  onChange={(val) => setVacForm({ ...vacForm, start_date: val })}
+                  data-testid="pk-vacate-date"
+                  className="w-full"
+                />
               </div>
               <p className="rounded-lg bg-rose-50 p-2.5 text-xs text-rose-700">Setelah dikosongkan, absensi Kasubid untuk posisi ini tidak dapat dilakukan hingga pejabat baru dilantik. Data lama tetap tersimpan.</p>
             </div>
