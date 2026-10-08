@@ -168,7 +168,7 @@ export default function RekapBulanan() {
 
       <Card className="overflow-hidden border-slate-200">
         {loading ? (
-          <TableSkeleton rows={8} columns={8} />
+          <TableSkeleton rows={8} columns={7} />
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
@@ -208,7 +208,6 @@ export default function RekapBulanan() {
                       </TooltipProvider>
                     </div>
                   </th>
-                  <th className="px-3 py-3 text-center">Total Kehadiran</th>
                 </tr>
               </thead>
               <tbody>
@@ -226,7 +225,6 @@ export default function RekapBulanan() {
                       </td>
                     ))}
                     <td className="px-3 py-2.5 text-center font-semibold text-slate-700">{r.jumlah_hari_kerja}</td>
-                    <td className="px-3 py-2.5 text-center font-extrabold text-slate-900">{r.total_kehadiran}</td>
                   </tr>
                 ))}
                 {filteredRows.length === 0 && (
@@ -245,7 +243,6 @@ export default function RekapBulanan() {
                     <td key={s} className="px-2 py-3 text-center">{displayGrand[s] ?? 0}</td>
                   ))}
                   <td className="px-3 py-3 text-center">{filteredRows.reduce((a: number, r: any) => a + (r.jumlah_hari_kerja || 0), 0)}</td>
-                  <td className="px-3 py-3 text-center">{displayGrand.HDR ?? 0}</td>
                 </tr>
               </tfoot>
             </table>
