@@ -147,7 +147,12 @@ export function UpdateProvider({ children }: { children: ReactNode }) {
       }, 1500);
     } catch (err: any) {
       console.error("[Auto-Updater] Gagal memasang pembaruan:", err);
-      toast.error("Gagal memasang pembaruan: " + (err?.message || "Terjadi kesalahan"));
+      const detail =
+        err?.message ||
+        (typeof err === "string" ? err : "") ||
+        (typeof err === "object" ? JSON.stringify(err) : "") ||
+        "Terjadi kesalahan";
+      toast.error("Gagal memasang pembaruan: " + detail);
       setIsDownloading(false);
       setProgress(null);
     }
