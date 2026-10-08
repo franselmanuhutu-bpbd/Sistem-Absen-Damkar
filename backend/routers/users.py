@@ -4,7 +4,7 @@ import uuid
 from config import ALLOWED_ROLES
 from database import get_db
 from models import UserIn
-from auth import require_roles, hash_password, clean
+from auth import require_roles, hash_password, clean, invalidate_user_cache
 from utils import now_iso, write_audit
 
 router = APIRouter(tags=["Users"])
@@ -71,6 +71,7 @@ async def update_user(uid: str, body: UserIn, user: dict = Depends(require_roles
     if body.password:
         update["password_hash"] = hash_password(body.password)
     await db.table("users").update(update).eq("id", uid).execute()
+    invalidate_user_cache(uid)
     await write_audit(user, "Mengubah user", detail=body.name)
     return {"ok": True}
 
@@ -81,5 +82,6 @@ async def deactivate_user(uid: str, user: dict = Depends(require_roles("admin"))
         raise HTTPException(status_code=400, detail="Tidak dapat menonaktifkan akun sendiri")
     db = await get_db()
     await db.table("users").update({"status": "INACTIVE"}).eq("id", uid).execute()
+    invalidate_user_cache(uid)
     await write_audit(user, "Menonaktifkan user")
     return {"ok": True}

@@ -21,6 +21,19 @@ async def get_db() -> AsyncClient:
     return _db_client
 
 
+async def reset_db_client():
+    """Reset the cached Supabase client so a fresh connection is made on the next request."""
+    global _db_client
+    if _db_client is not None:
+        try:
+            if hasattr(_db_client, "postgrest") and hasattr(_db_client.postgrest, "aclose"):
+                await _db_client.postgrest.aclose()
+        except Exception:
+            pass
+        _db_client = None
+
+
+
 def get_sync_db() -> Client:
     """Return a synchronous Supabase PostgREST client."""
     global _sync_client

@@ -3,8 +3,25 @@ from datetime import datetime, timezone, timedelta
 import bcrypt
 import jwt
 
-from config import JWT_SECRET, JWT_ALG
-from database import get_db
+from config import JWT_SECRET, JWT_ALG, logger
+from database import get_db, reset_db_client
+import time
+import asyncio
+import httpx
+import httpcore
+
+# In-memory user cache with TTL (seconds) to prevent redundant queries and withstand transient network drops
+_USER_CACHE: dict = {}
+USER_CACHE_TTL = 60
+
+
+def invalidate_user_cache(user_id: str = None):
+    """Invalidate cached user profile(s)."""
+    global _USER_CACHE
+    if user_id:
+        _USER_CACHE.pop(user_id, None)
+    else:
+        _USER_CACHE.clear()
 
 
 def hash_password(password: str) -> str:
@@ -57,12 +74,40 @@ async def get_current_user(request: Request) -> dict:
     except jwt.InvalidTokenError:
         raise HTTPException(status_code=401, detail="Token tidak valid")
 
-    db = await get_db()
-    res = await db.table("users").select("*").eq("id", payload["sub"]).execute()
-    user = res.data[0] if res.data else None
+    user_id = payload["sub"]
+    cached_entry = _USER_CACHE.get(user_id)
+    now = time.monotonic()
+    if cached_entry and (now - cached_entry[0] < USER_CACHE_TTL):
+        return clean(cached_entry[1])
+
+    user = None
+    last_err = None
+    for attempt in range(2):
+        try:
+            db = await get_db()
+            res = await db.table("users").select("*").eq("id", user_id).execute()
+            user = res.data[0] if res.data else None
+            break
+        except (httpx.ConnectError, httpx.ConnectTimeout, httpx.NetworkError, httpcore.ConnectError, httpcore.ConnectTimeout) as err:
+            last_err = err
+            logger.warning(f"Database network glitch while authenticating user {user_id}: {err}. Resetting connection...")
+            await reset_db_client()
+            if attempt == 0:
+                await asyncio.sleep(0.3)
+
+    if user is None and last_err is not None:
+        if cached_entry:
+            logger.info(f"Using stale cached profile for user {user_id} due to database unreachable.")
+            return clean(cached_entry[1])
+        raise HTTPException(
+            status_code=503,
+            detail="Koneksi ke database sedang terganggu. Silakan coba beberapa saat lagi.",
+        )
 
     if not user or user.get("status") == "INACTIVE":
         raise HTTPException(status_code=401, detail="User tidak ditemukan / nonaktif")
+
+    _USER_CACHE[user_id] = (now, user)
     return clean(user)
 
 

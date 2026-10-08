@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ArrowRightLeft, Flame, Star, Loader2, Pencil, Crown, History, RotateCcw, Search, X, Calendar, Clock, Sparkles } from "lucide-react";
@@ -51,7 +51,7 @@ export default function ManajemenRegu() {
   } | null>(null);
 
   const [rollSearch, setRollSearch] = useState("");
-  const [rollFilterTab, setRollFilterTab] = useState<"all" | "unassigned" | "other">("all");
+  const [rollFilterTab, setRollFilterTab] = useState<"all" | "unassigned" | "other">("unassigned");
   const [submittingRoll, setSubmittingRoll] = useState(false);
   const [rename, setRename] = useState<any>(null);
   const [cmd, setCmd] = useState<any>(null);
@@ -190,7 +190,7 @@ export default function ManajemenRegu() {
   // Buka dialog penataan / rolling regu (Batch Multi-select)
   const openRollDialog = (employeeIds: string[] = [], teamId: string = activeTeam) => {
     setRollSearch("");
-    setRollFilterTab("all");
+    setRollFilterTab("unassigned");
     setRoll({
       employee_ids: employeeIds,
       team_id: teamId,
@@ -352,6 +352,9 @@ export default function ManajemenRegu() {
               <RotateCcw className="h-5 w-5" />
               Reset Penempatan Regu
             </DialogTitle>
+            <DialogDescription className="text-xs text-slate-500">
+              Pilih lingkup tanggal untuk mengosongkan penempatan regu operasional.
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">
             {/* Pilihan Lingkup Tanggal Reset */}
@@ -647,9 +650,9 @@ export default function ManajemenRegu() {
               <ArrowRightLeft className="h-5 w-5 text-red-600" />
               Penempatan / Rolling Regu (Batch)
             </DialogTitle>
-            <p className="text-xs text-slate-500">
+            <DialogDescription className="text-xs text-slate-500">
               Pilih regu tujuan, tanggal mulai, dan cari serta centang beberapa pegawai sekaligus untuk ditambahkan ke regu.
-            </p>
+            </DialogDescription>
           </DialogHeader>
 
           {roll && (
@@ -1050,9 +1053,13 @@ export default function ManajemenRegu() {
       {/* Rename dialog */}
       <Dialog open={!!rename} onOpenChange={(o) => !o && setRename(null)}>
         <DialogContent>
-          <DialogHeader><DialogTitle>Ubah Nama Regu</DialogTitle></DialogHeader>
+          <DialogHeader>
+            <DialogTitle>Ubah Nama Regu</DialogTitle>
+            <DialogDescription className="text-xs text-slate-500">
+              ID regu tetap permanen, histori absensi tidak terpengaruh.
+            </DialogDescription>
+          </DialogHeader>
           {rename && <Input value={rename.name} onChange={(e) => setRename({ ...rename, name: e.target.value })} data-testid="rename-input" />}
-          <p className="text-xs text-slate-500">ID regu tetap permanen, histori absensi tidak terpengaruh.</p>
           <DialogFooter>
             <Button variant="outline" onClick={() => setRename(null)}>Batal</Button>
             <Button onClick={submitRename} className="bg-red-600 hover:bg-red-700" data-testid="rename-save-btn">Simpan</Button>
@@ -1063,7 +1070,12 @@ export default function ManajemenRegu() {
       {/* Commander dialog */}
       <Dialog open={!!cmd} onOpenChange={(o) => !o && setCmd(null)}>
         <DialogContent>
-          <DialogHeader><DialogTitle>Tetapkan Komandan {curTeam?.name}</DialogTitle></DialogHeader>
+          <DialogHeader>
+            <DialogTitle>Tetapkan Komandan {curTeam?.name}</DialogTitle>
+            <DialogDescription className="text-xs text-slate-500">
+              Pilih anggota regu sebagai komandan dan tentukan tanggal mulai berlaku.
+            </DialogDescription>
+          </DialogHeader>
           {cmd && (
             <div className="space-y-3">
               <div className="space-y-1.5">
@@ -1093,7 +1105,12 @@ export default function ManajemenRegu() {
       {/* Kasubid dialog */}
       <Dialog open={!!ksForm} onOpenChange={(o) => !o && setKsForm(null)}>
         <DialogContent>
-          <DialogHeader><DialogTitle>Tetapkan {ksForm?.label}</DialogTitle></DialogHeader>
+          <DialogHeader>
+            <DialogTitle>Tetapkan {ksForm?.label}</DialogTitle>
+            <DialogDescription className="text-xs text-slate-500">
+              Pilih pejabat dari data pegawai dan tentukan tanggal mulai pelantikan.
+            </DialogDescription>
+          </DialogHeader>
           {ksForm && (
             <div className="space-y-3">
               <div className="space-y-1.5">
@@ -1123,7 +1140,12 @@ export default function ManajemenRegu() {
       {/* Team history dialog */}
       <Dialog open={!!hist} onOpenChange={(o) => !o && setHist(null)}>
         <DialogContent className="max-h-[80vh] overflow-y-auto">
-          <DialogHeader><DialogTitle>Riwayat Perubahan Anggota — {curTeam?.name}</DialogTitle></DialogHeader>
+          <DialogHeader>
+            <DialogTitle>Riwayat Perubahan Anggota — {curTeam?.name}</DialogTitle>
+            <DialogDescription className="text-xs text-slate-500">
+              Catatan mutasi dan penempatan personil pada regu ini.
+            </DialogDescription>
+          </DialogHeader>
           <table className="w-full text-sm">
             <thead><tr className="border-b text-left text-xs text-slate-500"><th className="py-2">Tanggal</th><th className="py-2">Pegawai</th><th className="py-2">Aksi</th></tr></thead>
             <tbody>

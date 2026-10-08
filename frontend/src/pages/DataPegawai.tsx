@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Search, Plus, Pencil, Power, History, Loader2, Download } from "lucide-react";
 import { toast } from "sonner";
@@ -158,7 +158,12 @@ export default function DataPegawai() {
       {/* Form dialog */}
       <Dialog open={!!form} onOpenChange={(o) => !o && setForm(null)}>
         <DialogContent>
-          <DialogHeader><DialogTitle>{form?.id ? "Edit Pegawai" : "Tambah Pegawai"}</DialogTitle></DialogHeader>
+          <DialogHeader>
+            <DialogTitle>{form?.id ? "Edit Pegawai" : "Tambah Pegawai"}</DialogTitle>
+            <DialogDescription className="text-xs text-slate-500">
+              {form?.id ? "Perbarui informasi identitas dan jabatan pegawai." : "Masukkan data identitas pegawai baru."}
+            </DialogDescription>
+          </DialogHeader>
           {form && (
             <div className="space-y-3">
               <div className="space-y-1.5"><Label>Nama</Label><Input value={form.nama} onChange={(e) => setForm({ ...form, nama: e.target.value })} data-testid="form-nama" /></div>
@@ -177,7 +182,12 @@ export default function DataPegawai() {
       {/* History dialog */}
       <Dialog open={!!hist} onOpenChange={(o) => !o && setHist(null)}>
         <DialogContent>
-          <DialogHeader><DialogTitle>Riwayat Penempatan — {hist?.nama}</DialogTitle></DialogHeader>
+          <DialogHeader>
+            <DialogTitle>Riwayat Penempatan — {hist?.nama}</DialogTitle>
+            <DialogDescription className="text-xs text-slate-500">
+              Catatan riwayat regu dan masa penempatan pegawai ini.
+            </DialogDescription>
+          </DialogHeader>
           {histData.length === 0 ? <p className="py-6 text-center text-sm text-slate-400">Belum ada penempatan regu.</p> : (
             <div className="space-y-2">
               {histData.map((a) => (

@@ -1,10 +1,13 @@
 import os
-from fastapi import FastAPI, APIRouter
+from fastapi import FastAPI, APIRouter, Request
+from fastapi.responses import JSONResponse
 from starlette.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
+import httpx
+import httpcore
 
 from config import logger
-from database import ensure_schema
+from database import ensure_schema, reset_db_client
 from routers import (
     auth,
     users,
@@ -96,6 +99,19 @@ api.include_router(notifications.router)
 
 # Mount /api router and root
 app.include_router(api)
+
+
+@app.exception_handler(httpx.ConnectError)
+@app.exception_handler(httpx.ConnectTimeout)
+@app.exception_handler(httpcore.ConnectError)
+@app.exception_handler(httpcore.ConnectTimeout)
+async def db_connection_exception_handler(request: Request, exc: Exception):
+    logger.warning(f"Database network exception on {request.method} {request.url.path}: {exc}. Resetting client...")
+    await reset_db_client()
+    return JSONResponse(
+        status_code=503,
+        content={"detail": "Koneksi ke database sedang terganggu. Silakan coba beberapa saat lagi."},
+    )
 
 
 @app.get("/")

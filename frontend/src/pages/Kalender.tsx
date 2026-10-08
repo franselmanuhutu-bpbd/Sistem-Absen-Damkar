@@ -5,7 +5,7 @@ import { STATUSES, STATUS_CONFIG } from "@/lib/constants";
 import { StatusBadge } from "@/components/StatusBadge";
 import { Card } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { MonthPicker } from "@/components/MonthPicker";
 
 const curMonth = new Date().toISOString().slice(0, 7);
@@ -134,6 +134,9 @@ export default function Kalender() {
         <DialogContent className="max-h-[80vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Detail Absensi — {activeDay}</DialogTitle>
+            <DialogDescription className="text-xs text-slate-500">
+              Daftar status absensi seluruh personil pada tanggal ini.
+            </DialogDescription>
           </DialogHeader>
           {detail.length === 0 ? (
             <p className="py-6 text-center text-sm text-slate-400">Belum ada data absensi.</p>

@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Star, UserPlus, UserMinus, History, Search, X } from "lucide-react";
 import { toast } from "sonner";
@@ -168,7 +168,12 @@ export default function PengaturanKasubid() {
       {/* Set/Replace dialog */}
       <Dialog open={!!setForm} onOpenChange={(o) => !o && setSetForm(null)}>
         <DialogContent>
-          <DialogHeader><DialogTitle>Tetapkan {setForm?.label}</DialogTitle></DialogHeader>
+          <DialogHeader>
+            <DialogTitle>Tetapkan {setForm?.label}</DialogTitle>
+            <DialogDescription className="text-xs text-slate-500">
+              Pilih pegawai yang menjabat dan tentukan tanggal mulai berlaku.
+            </DialogDescription>
+          </DialogHeader>
           {setForm && (
             <div className="space-y-3">
               <div className="space-y-1.5">
@@ -198,7 +203,12 @@ export default function PengaturanKasubid() {
       {/* Vacate dialog */}
       <Dialog open={!!vacForm} onOpenChange={(o) => !o && setVacForm(null)}>
         <DialogContent>
-          <DialogHeader><DialogTitle>Kosongkan {vacForm?.label}</DialogTitle></DialogHeader>
+          <DialogHeader>
+            <DialogTitle>Kosongkan {vacForm?.label}</DialogTitle>
+            <DialogDescription className="text-xs text-slate-500">
+              Kosongkan posisi pejabat Kasubid ini mulai tanggal yang ditentukan.
+            </DialogDescription>
+          </DialogHeader>
           {vacForm && (
             <div className="space-y-3">
               <div className="space-y-1.5">
@@ -218,7 +228,12 @@ export default function PengaturanKasubid() {
       {/* History dialog */}
       <Dialog open={!!histPos} onOpenChange={(o) => !o && setHistPos(null)}>
         <DialogContent className="max-h-[80vh] overflow-y-auto">
-          <DialogHeader><DialogTitle>Riwayat Pejabat — {histPos?.label}</DialogTitle></DialogHeader>
+          <DialogHeader>
+            <DialogTitle>Riwayat Pejabat — {histPos?.label}</DialogTitle>
+            <DialogDescription className="text-xs text-slate-500">
+              Daftar pejabat yang pernah menjabat pada posisi ini.
+            </DialogDescription>
+          </DialogHeader>
           <div className="space-y-2">
             {(histPos?.history || []).map((h) => (
               <div key={h.id} className="flex items-center justify-between rounded-lg border border-slate-200 p-3">

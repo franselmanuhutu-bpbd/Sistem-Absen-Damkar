@@ -5,7 +5,7 @@ import { StatusBadge } from "@/components/StatusBadge";
 import { MonthPicker } from "@/components/MonthPicker";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { UserCircle, Flame, Star, Loader2, Calendar as CalIcon } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -187,7 +187,12 @@ export default function AbsensiSaya() {
 
       <Dialog open={!!detail} onOpenChange={(o) => !o && setDetail(null)}>
         <DialogContent className="max-h-[80vh] overflow-y-auto">
-          <DialogHeader><DialogTitle>Tanggal {detail && STATUS_CONFIG[detail].label} — {recap?.period_label}</DialogTitle></DialogHeader>
+          <DialogHeader>
+            <DialogTitle>Tanggal {detail && STATUS_CONFIG[detail].label} — {recap?.period_label}</DialogTitle>
+            <DialogDescription className="text-xs text-slate-500">
+              Rincian tanggal dan regu piket untuk status kehadiran ini.
+            </DialogDescription>
+          </DialogHeader>
           <div className="space-y-2">
             {(recap?.dates?.[detail] || []).map((d, i) => (
               <div key={i} className="flex items-center justify-between rounded-lg border border-slate-100 px-3 py-2">

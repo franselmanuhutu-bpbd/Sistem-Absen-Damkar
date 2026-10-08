@@ -12,10 +12,23 @@ const server = serve({
       const url = new URL(req.url);
       const targetUrl = `${BACKEND_URL}${url.pathname}${url.search}`;
       try {
-        return await fetch(targetUrl, {
+        const headers = new Headers(req.headers);
+        headers.delete("host");
+        const init: RequestInit = {
           method: req.method,
-          headers: req.headers,
-          body: req.body,
+          headers,
+        };
+        if (req.method !== "GET" && req.method !== "HEAD") {
+          init.body = req.body;
+        }
+        const resp = await fetch(targetUrl, init);
+        const resHeaders = new Headers(resp.headers);
+        resHeaders.delete("connection");
+        resHeaders.delete("keep-alive");
+        return new Response(resp.body, {
+          status: resp.status,
+          statusText: resp.statusText,
+          headers: resHeaders,
         });
       } catch (err: any) {
         console.error(`[Proxy Error] Gagal terhubung ke ${targetUrl}:`, err?.message || err);

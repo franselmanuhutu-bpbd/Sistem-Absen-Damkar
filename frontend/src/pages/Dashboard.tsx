@@ -72,11 +72,6 @@ export default function Dashboard() {
   const loadedDateRef = useRef<string | null>(null);
 
   useEffect(() => {
-    // Skip re-fetching if date was set from the response matching loaded data
-    if (date && date === loadedDateRef.current && data) {
-      return;
-    }
-
     let active = true;
     const startedAt = Date.now();
     const maxAttempts = 3;
@@ -105,29 +100,10 @@ export default function Dashboard() {
           if (active) {
             setData(response.data);
             loadedDateRef.current = response.data.date;
-            if (!date && response.data.date) {
-              setDate(response.data.date);
-            }
-            console.info("[Dashboard] Data loaded", {
-              date: response.data.date,
-              attempt,
-              durationMs: Date.now() - startedAt,
-              teams: response.data.per_team.length,
-              totalEmployees: response.data.total_employees,
-            });
           }
           return;
         } catch (err) {
           lastError = err;
-          console.error("[Dashboard] Load attempt failed", {
-            date,
-            attempt,
-            maxAttempts,
-            status: err?.response?.status,
-            message: err?.message,
-            response: err?.response?.data,
-          });
-
           if (attempt < maxAttempts && isRetryable(err)) {
             await wait(500 * 2 ** (attempt - 1));
           } else {
@@ -138,11 +114,6 @@ export default function Dashboard() {
 
       if (active) {
         setLoadError(apiError(lastError));
-        console.error("[Dashboard] Failed after retries", {
-          date,
-          durationMs: Date.now() - startedAt,
-          error: lastError,
-        });
       }
     };
 
@@ -177,7 +148,7 @@ export default function Dashboard() {
           <Input
             type="date"
             data-testid="dashboard-date"
-            value={date}
+            value={date || data?.date || ""}
             onChange={(e) => setDate(e.target.value)}
             className="h-10 w-44 bg-white cursor-pointer [&::-webkit-calendar-picker-indicator]:cursor-pointer"
           />
@@ -409,8 +380,14 @@ export default function Dashboard() {
             )}
           </div>
         ) : (
-          <div className="h-72 w-full">
-            <ResponsiveContainer width="100%" height="100%" minHeight={200}>
+          <div className="h-72 w-full min-w-0" style={{ width: "100%", height: 288, minWidth: 0, minHeight: 288 }}>
+            <ResponsiveContainer
+              width="100%"
+              height="100%"
+              minWidth={0}
+              minHeight={200}
+              initialDimension={{ width: 500, height: 288 }}
+            >
               <BarChart data={chartData} margin={{ top: 8, right: 8, left: -16, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
                 <XAxis dataKey="name" tick={{ fontSize: 12, fill: "#64748b" }} axisLine={false} tickLine={false} />

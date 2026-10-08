@@ -4,7 +4,7 @@ import { STATUSES, STATUS_CONFIG, monthLabel } from "@/lib/constants";
 import { MonthPicker } from "@/components/MonthPicker";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { StatusBadge } from "@/components/StatusBadge";
 import { Star, FileSpreadsheet, FileText, Loader2, Eye } from "lucide-react";
@@ -152,7 +152,12 @@ export default function RekapKasubid() {
 
       <Dialog open={!!detailPos} onOpenChange={(o) => !o && setDetailPos(null)}>
         <DialogContent className="max-h-[80vh] overflow-y-auto">
-          <DialogHeader><DialogTitle>Detail Absensi {detailPos && data?.positions.find((p) => p.position_id === detailPos)?.label}</DialogTitle></DialogHeader>
+          <DialogHeader>
+            <DialogTitle>Detail Absensi {detailPos && data?.positions.find((p) => p.position_id === detailPos)?.label}</DialogTitle>
+            <DialogDescription className="text-xs text-slate-500">
+              Daftar rekap kehadiran pejabat pada periode yang dipilih.
+            </DialogDescription>
+          </DialogHeader>
           <div className="flex gap-2 mb-2">
             <Select value={filterStatus} onValueChange={setFilterStatus}>
               <SelectTrigger className="h-9 w-48" data-testid="kasubid-filter-status"><SelectValue /></SelectTrigger>

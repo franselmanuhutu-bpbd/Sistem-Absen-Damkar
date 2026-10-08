@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { UserPlus, Pencil, Power } from "lucide-react";
@@ -135,7 +135,12 @@ export default function UserManagement() {
 
       <Dialog open={!!form} onOpenChange={(o) => !o && setForm(null)}>
         <DialogContent>
-          <DialogHeader><DialogTitle>{form?.id ? "Edit User" : "Tambah User"}</DialogTitle></DialogHeader>
+          <DialogHeader>
+            <DialogTitle>{form?.id ? "Edit User" : "Tambah User"}</DialogTitle>
+            <DialogDescription className="text-xs text-slate-500">
+              {form?.id ? "Perbarui informasi akun, hak akses, dan status pengguna." : "Buat akun pengguna baru dengan role dan kredensial akses."}
+            </DialogDescription>
+          </DialogHeader>
           {form && (
             <div className="space-y-3">
               <div className="space-y-1.5"><Label>Nama</Label><Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} data-testid="user-name" /></div>
