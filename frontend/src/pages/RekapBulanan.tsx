@@ -29,7 +29,7 @@ export default function RekapBulanan() {
     : 0;
 
   useEffect(() => {
-    api.get("/teams").then((r) => setTeams(r.data));
+    api.get("/teams").then((r) => setTeams(r.data)).catch((e) => toast.error(apiError(e)));
   }, []);
 
   const load = useCallback(() => {
@@ -37,7 +37,11 @@ export default function RekapBulanan() {
     const params: Record<string, any> = { month };
     if (teamId !== "all") params.team_id = teamId;
     if (category !== "all") params.category = category;
-    api.get("/recap/monthly", { params }).then((r) => setData(r.data)).finally(() => setLoading(false));
+    api
+      .get("/recap/monthly", { params })
+      .then((r) => setData(r.data))
+      .catch((e) => toast.error(apiError(e)))
+      .finally(() => setLoading(false));
   }, [month, teamId, category]);
 
   useEffect(() => { load(); }, [load]);

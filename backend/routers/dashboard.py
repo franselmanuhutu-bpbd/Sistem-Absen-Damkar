@@ -68,11 +68,6 @@ async def dashboard(date: str = None, user: dict = Depends(get_current_user)):
         for r in records
         if r.get("team_id") and r.get("employee_id") in active_ids
     }
-    today_team_map = (
-        await resolve_teams_for_date(today_iso)
-        if ref != today_iso
-        else team_map
-    )
 
     def empty():
         return {s: 0 for s in STATUSES}
@@ -80,9 +75,14 @@ async def dashboard(date: str = None, user: dict = Depends(get_current_user)):
     totals = empty()
     per_team = {t["id"]: {"team": t, "members": 0, **empty()} for t in teams}
     has_att = len(rec_team_map) > 0
+
+    # PRIORITAS PENENTUAN REGU PEGAWAI PADA TANGGAL ACUAN (REF):
+    # 1. team_map: Penempatan aktif dari team_assignments pada tanggal ref (Single Source of Truth)
+    # 2. rec_team_map: Fallback ke riwayat absensi jika penempatan regu kosong pada tanggal tersebut
+    # PENTING: Jangan fallback ke today_team_map agar tanggal yang di-reset akurat menampilkan 0 anggota.
     for e in active_emps:
         eid = e["id"]
-        tid = (rec_team_map.get(eid) if has_att else None) or team_map.get(eid) or today_team_map.get(eid)
+        tid = team_map.get(eid) or (rec_team_map.get(eid) if has_att else None)
         if tid in per_team:
             per_team[tid]["members"] += 1
 
@@ -93,7 +93,8 @@ async def dashboard(date: str = None, user: dict = Depends(get_current_user)):
         status = str(record.get("status") or "").strip().upper()
         if status not in STATUSES:
             continue
-        team_id = record.get("team_id") or team_map.get(employee_id) or today_team_map.get(employee_id)
+        # Regu efektif pegawai saat absensi dihitung: ikuti penempatan aktif terlebih dahulu
+        team_id = team_map.get(employee_id) or record.get("team_id")
         totals[status] += 1
         if team_id in per_team:
             per_team[team_id][status] += 1
@@ -125,8 +126,13 @@ async def dashboard(date: str = None, user: dict = Depends(get_current_user)):
         })
 
     for idx, (t, cid) in enumerate(zip(team_list, commander_eids)):
+        # Komandan pada tanggal ref hanya sah jika yang bersangkutan terdaftar di regu ini
+        assigned_in_team = {eid for eid, tid in team_map.items() if tid == t["team"]["id"]}
+        if cid and cid not in assigned_in_team and cid not in rec_team_map:
+            cid = None
+
         today_cid = today_commander_eids[idx]
-        effective_cid = cid or today_cid
+        effective_cid = cid
         cname = emp_names.get(effective_cid)
         if not cname and effective_cid:
             cemp = (await db.table("employees").select("nama").eq("id", effective_cid).limit(1).execute()).data
@@ -161,14 +167,14 @@ async def org_structure(date: str = None, user: dict = Depends(get_current_user)
     ref = date or _date.today().isoformat()
     teams = (await db.table("teams").select("*").order("order").limit(100).execute()).data or []
     team_map = await resolve_teams_for_date(ref)
-    today_team_map = await resolve_teams_for_date(_date.today().isoformat()) if ref != _date.today().isoformat() else team_map
     emps = {e["id"]: e for e in ((await db.table("employees").select("*").eq("status", "ACTIVE").limit(5000).execute()).data or [])}
     records = (await db.table("attendance").select("employee_id, team_id").eq("date", ref).limit(10000).execute()).data or []
     rec_team_map = {r["employee_id"]: r["team_id"] for r in records if r.get("team_id") and r.get("employee_id") in emps}
     has_att = len(rec_team_map) > 0
     counts = {}
+    # Hitung jumlah anggota tiap regu pada tanggal ref: prioritas team_assignments
     for eid in emps:
-        tid = (rec_team_map.get(eid) if has_att else None) or team_map.get(eid) or today_team_map.get(eid)
+        tid = team_map.get(eid) or (rec_team_map.get(eid) if has_att else None)
         if tid:
             counts[tid] = counts.get(tid, 0) + 1
     kasubid = []
@@ -181,8 +187,9 @@ async def org_structure(date: str = None, user: dict = Depends(get_current_user)
     team_out = []
     for t in teams:
         cid = await resolve_commander_for_date(t["id"], ref)
-        if not cid and ref != _date.today().isoformat():
-            cid = await resolve_commander_for_date(t["id"], _date.today().isoformat())
+        assigned_in_team = {eid for eid, tid in team_map.items() if tid == t["id"]}
+        if cid and cid not in assigned_in_team:
+            cid = None
         team_out.append({**t, "members_count": counts.get(t["id"], 0),
                          "commander_id": cid, "commander_name": emps.get(cid, {}).get("nama") if cid else None})
     return {"date": ref, "kasubid": kasubid, "teams": team_out}

@@ -35,10 +35,17 @@ async def _async_test():
             builder.select.return_value.in_.return_value.execute = AsyncMock(
                 return_value=MagicMock(data=[])
             )
+            builder.select.return_value.eq.return_value.execute = AsyncMock(
+                return_value=MagicMock(data=[])
+            )
             builder.update.return_value.eq.return_value.execute = AsyncMock(
                 return_value=MagicMock(data=[])
             )
             builder.insert.return_value.execute = AsyncMock(
+                return_value=MagicMock(data=[])
+            )
+        elif tbl == "attendance":
+            builder.update.return_value.eq.return_value.gte.return_value.execute = AsyncMock(
                 return_value=MagicMock(data=[])
             )
         elif tbl == "audit_logs":

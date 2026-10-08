@@ -4,6 +4,25 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import "@/index.css";
 import App from "@/App";
 
+// Tangani unhandled rejection jaringan secara global agar dev popup Bun tidak memblokir layar pengguna
+if (typeof window !== "undefined") {
+  window.addEventListener("unhandledrejection", (event) => {
+    const reason = event.reason;
+    const isNetwork =
+      reason?.isAxiosError ||
+      reason?.name === "AxiosError" ||
+      reason?.code === "ERR_NETWORK" ||
+      reason?.message?.includes("Network Error") ||
+      reason?.message?.includes("Failed to fetch");
+
+    if (isNetwork) {
+      // Mencegah overlay modal pengembang Bun muncul di layar browser
+      event.preventDefault();
+      console.warn("[Jaringan Lambat / Terputus]:", reason?.message || "Network Error");
+    }
+  });
+}
+
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {

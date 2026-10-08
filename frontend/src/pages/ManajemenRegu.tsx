@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
-import { ArrowRightLeft, Flame, Star, Loader2, Pencil, Crown, History, RotateCcw, Search, X, Calendar } from "lucide-react";
+import { ArrowRightLeft, Flame, Star, Loader2, Pencil, Crown, History, RotateCcw, Search, X, Calendar, Clock, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { TableSkeleton } from "@/components/ui/table-skeleton";
 import { EmployeeSearchSelect } from "@/components/EmployeeSearchSelect";
@@ -17,6 +17,17 @@ import { cn } from "@/lib/utils";
 import { formatDateId } from "@/lib/constants";
 
 const today = new Date().toISOString().slice(0, 10);
+
+// Helper untuk menambahkan N bulan ke tanggal YYYY-MM-DD (siklus 3 bulan/triwulan, 6 bulan, dll.)
+function addMonthsToDate(dateStr: string, months: number): string {
+  if (!dateStr) return dateStr;
+  const [y, m, d] = dateStr.split("-").map(Number);
+  const target = new Date(y, m - 1 + months, d);
+  const year = target.getFullYear();
+  const month = String(target.getMonth() + 1).padStart(2, "0");
+  const day = String(target.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
 
 export default function ManajemenRegu() {
   const { user } = useAuth();
@@ -28,11 +39,17 @@ export default function ManajemenRegu() {
   const [kasubid, setKasubid] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [memberSearch, setMemberSearch] = useState("");
+
+  // State untuk penataan / rolling regu (Batch Multi-select)
   const [roll, setRoll] = useState<{
     employee_ids: string[];
     team_id: string;
+    // Mode tanggal: tunggal (1 hari), rentang (triwulan dll), atau seterusnya
+    mode: "tunggal" | "rentang" | "seterusnya";
     start_date: string;
+    end_date: string;
   } | null>(null);
+
   const [rollSearch, setRollSearch] = useState("");
   const [rollFilterTab, setRollFilterTab] = useState<"all" | "unassigned" | "other">("all");
   const [submittingRoll, setSubmittingRoll] = useState(false);
@@ -41,37 +58,70 @@ export default function ManajemenRegu() {
   const [ksForm, setKsForm] = useState<any>(null);
   const [hist, setHist] = useState<any>(null);
   const [histData, setHistData] = useState<any[]>([]);
-  const [resetOpen, setResetOpen] = useState(false);
+
+  // State konfigurasi dialog reset penempatan regu
+  const [resetConfig, setResetConfig] = useState<{
+    open: boolean;
+    mode: "single" | "range" | "all"; // Lingkup tanggal reset: 1 hari terpilih, rentang tanggal, atau semua periode
+    date: string; // Tanggal tunggal
+    start_date: string; // Rentang mulai
+    end_date: string; // Rentang selesai
+    team_id: string; // Regu spesifik atau "" untuk semua regu
+    submitting: boolean;
+  }>({
+    open: false,
+    mode: "single",
+    date: today,
+    start_date: today,
+    end_date: today,
+    team_id: "",
+    submitting: false,
+  });
+
   const isAdmin = Boolean(user && user.role === "admin");
 
-  const loadTeams = () => api.get("/teams").then((r) => { setTeams(r.data); if (!activeTeam && r.data[0]) setActiveTeam(r.data[0].id); });
-  const loadEmp = (d = selectedDate) => api.get("/employees", { params: { status: "ACTIVE", date: d } }).then((r) => setAllEmp(r.data));
-  const loadKasubid = (d = selectedDate) => api.get("/kasubid", { params: { date: d } }).then((r) => setKasubid(r.data));
+  const loadTeams = () => api.get("/teams").then((r) => { setTeams(r.data); if (!activeTeam && r.data[0]) setActiveTeam(r.data[0].id); }).catch((e) => toast.error(apiError(e)));
+  const loadEmp = (d = selectedDate) => api.get("/employees", { params: { status: "ACTIVE", date: d } }).then((r) => setAllEmp(r.data)).catch((e) => toast.error(apiError(e)));
+  const loadKasubid = (d = selectedDate) => api.get("/kasubid", { params: { date: d } }).then((r) => setKasubid(r.data)).catch((e) => toast.error(apiError(e)));
   useEffect(() => { loadTeams(); }, []);
   useEffect(() => { loadEmp(selectedDate); loadKasubid(selectedDate); }, [selectedDate]);
 
   const loadDetail = (tid = activeTeam, d = selectedDate) => {
     if (!tid) return;
     setLoading(true);
-    api.get(`/teams/${tid}/detail`, { params: { date: d } }).then((r) => setDetail(r.data)).finally(() => setLoading(false));
+    api.get(`/teams/${tid}/detail`, { params: { date: d } }).then((r) => setDetail(r.data)).catch((e) => toast.error(apiError(e))).finally(() => setLoading(false));
   };
   useEffect(() => { if (activeTeam) loadDetail(activeTeam, selectedDate); }, [activeTeam, selectedDate]);
 
+  // Simpan penempatan anggota massal dengan fleksibilitas mode tanggal (Single date, Range date, Seterusnya)
   const submitRoll = async () => {
     if (!roll?.employee_ids?.length || !roll?.team_id) {
       toast.error("Pilih setidaknya satu pegawai dan tentukan regu tujuan.");
       return;
     }
+    if (roll.mode === "rentang" && roll.end_date && roll.end_date < roll.start_date) {
+      toast.error("Tanggal akhir tidak boleh lebih awal dari tanggal mulai.");
+      return;
+    }
     setSubmittingRoll(true);
     try {
+      // Tentukan tanggal akhir sesuai mode yang dipilih
+      const finalEndDate = roll.mode === "tunggal"
+        ? roll.start_date
+        : (roll.mode === "rentang" ? (roll.end_date || null) : null);
+
       const res = await api.post("/assignments/batch", {
         employee_ids: roll.employee_ids,
         team_id: roll.team_id,
         start_date: roll.start_date,
-        end_date: null,
+        end_date: finalEndDate,
       });
       const count = res.data?.count ?? roll.employee_ids.length;
-      toast.success(`${count} penempatan regu berhasil disimpan`);
+      const modeLabel = roll.mode === "tunggal"
+        ? `Tanggal Tunggal (${formatDateId(roll.start_date)})`
+        : (roll.mode === "rentang" ? `Rentang ${formatDateId(roll.start_date)} s/d ${formatDateId(finalEndDate!)}` : "Seterusnya");
+
+      toast.success(`${count} penempatan regu berhasil disimpan [${modeLabel}]`);
       setRoll(null);
       loadDetail(activeTeam, selectedDate);
       loadEmp(selectedDate);
@@ -137,13 +187,16 @@ export default function ManajemenRegu() {
     setRoll({ ...roll, employee_ids: [] });
   };
 
+  // Buka dialog penataan / rolling regu (Batch Multi-select)
   const openRollDialog = (employeeIds: string[] = [], teamId: string = activeTeam) => {
     setRollSearch("");
     setRollFilterTab("all");
     setRoll({
       employee_ids: employeeIds,
       team_id: teamId,
+      mode: "tunggal", // Default ke rentang tanggal (kebutuhan reguler triwulan)
       start_date: selectedDate,
+      end_date: addMonthsToDate(selectedDate, 3), // Default 3 bulan ke depan
     });
   };
   const submitRename = async () => {
@@ -169,15 +222,65 @@ export default function ManajemenRegu() {
   };
   const openHist = () => {
     setHist(true);
-    api.get(`/teams/${activeTeam}/history`).then((r) => setHistData(r.data));
+    api.get(`/teams/${activeTeam}/history`).then((r) => setHistData(r.data)).catch((e) => toast.error(apiError(e)));
   };
+
+  // Buka dialog reset dengan prefill tanggal acuan terpilih dan regu yang sedang dibuka/dilihat user
+  const openResetDialog = () => {
+    setResetConfig({
+      open: true,
+      mode: "single", // Default mengosongkan tanggal yang sedang aktif dilihat
+      date: selectedDate,
+      start_date: selectedDate,
+      end_date: addMonthsToDate(selectedDate, 3),
+      team_id: activeTeam || "", // Prefill otomatis ke regu yang sedang aktif dipilih di UI
+      submitting: false,
+    });
+  };
+
+  // Eksekusi reset penempatan regu dengan dukungan tanggal tunggal, rentang tanggal, atau reset total
   const submitReset = async () => {
+    setResetConfig((prev) => ({ ...prev, submitting: true }));
     try {
-      const { data } = await api.post("/assignments/reset");
-      toast.success(`${data.deleted} penempatan dihapus. Semua regu kini kosong — silakan tata ulang anggota satu per satu.`);
-      setResetOpen(false);
-      loadDetail(activeTeam, selectedDate); loadEmp(selectedDate);
-    } catch (e) { toast.error(apiError(e)); }
+      // Siapkan payload dengan parameter mode dan regu target
+      const payload: any = {
+        mode: resetConfig.mode,
+        team_id: resetConfig.team_id || null, // null berarti semua regu
+        reset_attendance_teams: true, // Kosongkan juga status regu di data absensi terkait
+      };
+
+      if (resetConfig.mode === "single") {
+        payload.date = resetConfig.date;
+      } else if (resetConfig.mode === "range") {
+        if (resetConfig.end_date < resetConfig.start_date) {
+          toast.error("Tanggal akhir tidak boleh lebih awal dari tanggal mulai.");
+          setResetConfig((prev) => ({ ...prev, submitting: false }));
+          return;
+        }
+        payload.start_date = resetConfig.start_date;
+        payload.end_date = resetConfig.end_date;
+      }
+
+      // Kirim permintaan reset ke backend API
+      const { data } = await api.post("/assignments/reset", payload);
+      toast.success(`Reset penempatan regu berhasil (${data.scope || "selesai"}).`);
+      setResetConfig((prev) => ({ ...prev, open: false, submitting: false }));
+
+      // Sinkronkan kembali tampilan dan data anggota
+      const targetDate = resetConfig.mode === "single"
+        ? resetConfig.date
+        : (resetConfig.mode === "range" ? resetConfig.start_date : selectedDate);
+
+      if (targetDate && targetDate !== selectedDate) {
+        setSelectedDate(targetDate);
+      } else {
+        loadDetail(activeTeam, selectedDate);
+        loadEmp(selectedDate);
+      }
+    } catch (e) {
+      toast.error(apiError(e));
+      setResetConfig((prev) => ({ ...prev, submitting: false }));
+    }
   };
 
   const curTeam = teams.find((t) => t.id === activeTeam);
@@ -209,7 +312,13 @@ export default function ManajemenRegu() {
             />
           </div>
           {isAdmin && (
-            <Button variant="outline" size="sm" onClick={() => setResetOpen(true)} data-testid="reset-assignments-btn" className="h-9 gap-2 border-rose-200 text-rose-600 hover:bg-rose-50 text-xs">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={openResetDialog}
+              data-testid="reset-assignments-btn"
+              className="h-9 gap-2 border-rose-200 text-rose-600 hover:bg-rose-50 text-xs"
+            >
               <RotateCcw className="h-3.5 w-3.5" /> Reset Penempatan Regu
             </Button>
           )}
@@ -235,16 +344,181 @@ export default function ManajemenRegu() {
         </div>
       )}
 
-      <Dialog open={resetOpen} onOpenChange={setResetOpen}>
-        <DialogContent>
-          <DialogHeader><DialogTitle>Reset Penempatan Regu</DialogTitle></DialogHeader>
-          <div className="space-y-3">
-            <p className="text-sm text-slate-600">Tindakan ini mengosongkan <b>seluruh penempatan pegawai pada semua regu</b>, sehingga Anda dapat menata ulang anggota satu per satu dari awal melalui tombol <b>Rolling</b> / <b>Pindahkan</b>.</p>
-            <p className="rounded-lg bg-rose-50 p-2.5 text-xs text-rose-700">⚠️ Data absensi yang sudah tersimpan TIDAK dihapus. Komandan Regu &amp; Kasubid juga tidak terpengaruh. Rekap akan mengikuti penempatan baru yang Anda buat.</p>
+      {/* Dialog Reset Fleksibel (Single Date, Range Date, atau All) */}
+      <Dialog open={resetConfig.open} onOpenChange={(o) => setResetConfig((prev) => ({ ...prev, open: o }))}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-rose-700">
+              <RotateCcw className="h-5 w-5" />
+              Reset Penempatan Regu
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            {/* Pilihan Lingkup Tanggal Reset */}
+            <div className="space-y-2">
+              <Label className="text-xs font-bold text-slate-700">Pilih Lingkup Tanggal yang Dikosongkan:</Label>
+              <div className="space-y-2">
+                {/* 1. Tanggal Terpilih Saja */}
+                <div
+                  onClick={() => setResetConfig((prev) => ({ ...prev, mode: "single" }))}
+                  className={cn(
+                    "p-3 rounded-lg border text-xs cursor-pointer transition-colors space-y-1",
+                    resetConfig.mode === "single"
+                      ? "border-sky-500 bg-sky-50/70"
+                      : "border-slate-200 hover:bg-slate-50"
+                  )}
+                >
+                  <div className="flex items-center justify-between font-semibold text-slate-800">
+                    <span className="flex items-center gap-1.5">
+                      <input
+                        type="radio"
+                        checked={resetConfig.mode === "single"}
+                        onChange={() => { }}
+                        className="text-sky-600"
+                      />
+                      Tanggal Terpilih Saja ({formatDateId(resetConfig.date)})
+                    </span>
+                    <Badge variant="outline" className="text-[10px] bg-emerald-50 text-emerald-700 border-emerald-200">
+                      Paling Aman
+                    </Badge>
+                  </div>
+                  <p className="text-[11px] text-slate-500 pl-4">
+                    Hanya mengosongkan penempatan regu pada tanggal {formatDateId(resetConfig.date)}. Penempatan sebelum dan sesudah tanggal ini tetap utuh.
+                  </p>
+                  {resetConfig.mode === "single" && (
+                    <div className="pt-2 pl-4">
+                      <Label className="text-[11px] text-slate-600">Ubah Tanggal Target:</Label>
+                      <Input
+                        type="date"
+                        value={resetConfig.date}
+                        onChange={(e) => setResetConfig((prev) => ({ ...prev, date: e.target.value }))}
+                        className="h-8 text-xs bg-white mt-1 w-44"
+                      />
+                    </div>
+                  )}
+                </div>
+
+                {/* 2. Rentang Tanggal Tertentu */}
+                <div
+                  onClick={() => setResetConfig((prev) => ({ ...prev, mode: "range" }))}
+                  className={cn(
+                    "p-3 rounded-lg border text-xs cursor-pointer transition-colors space-y-1",
+                    resetConfig.mode === "range"
+                      ? "border-sky-500 bg-sky-50/70"
+                      : "border-slate-200 hover:bg-slate-50"
+                  )}
+                >
+                  <div className="flex items-center justify-between font-semibold text-slate-800">
+                    <span className="flex items-center gap-1.5">
+                      <input
+                        type="radio"
+                        checked={resetConfig.mode === "range"}
+                        onChange={() => { }}
+                        className="text-sky-600"
+                      />
+                      Rentang Tanggal (Kuartal / Periode Tertentu)
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-500 pl-4">
+                    Mengosongkan penempatan regu yang berada di antara tanggal mulai dan tanggal akhir.
+                  </p>
+                  {resetConfig.mode === "range" && (
+                    <div className="grid grid-cols-2 gap-2 pt-2 pl-4">
+                      <div>
+                        <Label className="text-[11px] text-slate-600">Mulai:</Label>
+                        <Input
+                          type="date"
+                          value={resetConfig.start_date}
+                          onChange={(e) => setResetConfig((prev) => ({ ...prev, start_date: e.target.value }))}
+                          className="h-8 text-xs bg-white mt-1"
+                        />
+                      </div>
+                      <div>
+                        <Label className="text-[11px] text-slate-600">Sampai:</Label>
+                        <Input
+                          type="date"
+                          value={resetConfig.end_date}
+                          onChange={(e) => setResetConfig((prev) => ({ ...prev, end_date: e.target.value }))}
+                          className="h-8 text-xs bg-white mt-1"
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* 3. Reset Total (Semua Periode) */}
+                <div
+                  onClick={() => setResetConfig((prev) => ({ ...prev, mode: "all" }))}
+                  className={cn(
+                    "p-3 rounded-lg border text-xs cursor-pointer transition-colors space-y-1",
+                    resetConfig.mode === "all"
+                      ? "border-rose-400 bg-rose-50/70"
+                      : "border-slate-200 hover:bg-slate-50"
+                  )}
+                >
+                  <div className="flex items-center justify-between font-semibold text-slate-800">
+                    <span className="flex items-center gap-1.5">
+                      <input
+                        type="radio"
+                        checked={resetConfig.mode === "all"}
+                        onChange={() => { }}
+                        className="text-rose-600"
+                      />
+                      Semua Periode (Reset Total)
+                    </span>
+                    <Badge variant="outline" className="text-[10px] bg-rose-100 text-rose-800 border-rose-300">
+                      Seluruh Riwayat
+                    </Badge>
+                  </div>
+                  <p className="text-[11px] text-slate-500 pl-4">
+                    Menghapus seluruh riwayat penempatan regu dari awal waktu hingga seterusnya.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Pilihan Lingkup Regu */}
+            <div className="space-y-1.5">
+              <Label className="text-xs font-bold text-slate-700">Lingkup Regu yang Direset:</Label>
+              <Select
+                value={resetConfig.team_id || "all"}
+                onValueChange={(v) => setResetConfig((prev) => ({ ...prev, team_id: v === "all" ? "" : v }))}
+              >
+                <SelectTrigger className="h-9 bg-white text-xs">
+                  <SelectValue placeholder="Pilih lingkup regu" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Semua Regu (Regu 1 s/d 6)</SelectItem>
+                  {teams.map((t) => (
+                    <SelectItem key={t.id} value={t.id}>
+                      Hanya {t.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <p className="rounded-lg bg-amber-50 p-2.5 text-[11px] text-amber-800 border border-amber-200">
+              ℹ️ <b>Catatan:</b> Data master pegawai (54 orang, nama, NIP) tetap aman. Komandan Regu &amp; Kasubid tidak terhapus.
+            </p>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setResetOpen(false)}>Batal</Button>
-            <Button onClick={submitReset} className="bg-rose-600 hover:bg-rose-700" data-testid="reset-confirm-btn">Ya, Reset Semua</Button>
+            <Button
+              variant="outline"
+              disabled={resetConfig.submitting}
+              onClick={() => setResetConfig((prev) => ({ ...prev, open: false }))}
+            >
+              Batal
+            </Button>
+            <Button
+              onClick={submitReset}
+              disabled={resetConfig.submitting}
+              className="bg-rose-600 hover:bg-rose-700 gap-1.5"
+              data-testid="reset-confirm-btn"
+            >
+              {resetConfig.submitting && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+              {resetConfig.mode === "all" ? "Ya, Reset Total" : "Reset Penempatan"}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -380,33 +654,165 @@ export default function ManajemenRegu() {
 
           {roll && (
             <div className="flex-1 overflow-y-auto space-y-4 py-2 pr-1">
-              {/* Target Team & Date in 2-column grid */}
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 bg-slate-50 p-3.5 rounded-xl border border-slate-200/80">
-                <div className="space-y-1.5">
-                  <Label className="text-xs font-bold text-slate-700">Pindah ke Regu Tujuan</Label>
-                  <Select value={roll.team_id} onValueChange={(v) => setRoll({ ...roll, team_id: v })}>
-                    <SelectTrigger data-testid="roll-team" className="h-9 bg-white">
-                      <SelectValue placeholder="Pilih regu tujuan" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {teams.map((t) => (
-                        <SelectItem key={t.id} value={t.id}>
-                          <span className="font-medium">{t.name}</span>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+              {/* Target Team & Date Mode Selection */}
+              <div className="space-y-3 bg-slate-50 p-3.5 rounded-xl border border-slate-200/80">
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-bold text-slate-700">Pindah ke Regu Tujuan</Label>
+                    <Select value={roll.team_id} onValueChange={(v) => setRoll({ ...roll, team_id: v })}>
+                      <SelectTrigger data-testid="roll-team" className="h-9 bg-white">
+                        <SelectValue placeholder="Pilih regu tujuan" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {teams.map((t) => (
+                          <SelectItem key={t.id} value={t.id}>
+                            <span className="font-medium">{t.name}</span>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-bold text-slate-700">Mode Periode Penempatan</Label>
+                    <div className="grid grid-cols-3 gap-1 bg-slate-200/70 p-1.5 rounded-lg text-xs">
+                      <button
+                        type="button"
+                        onClick={() => setRoll({ ...roll, mode: "tunggal", end_date: roll.end_date || addMonthsToDate(roll.start_date, 3) })}
+                        className={cn(
+                          "py-1.5 px-2 rounded-md font-semibold text-[11px] transition-all",
+                          roll.mode === "tunggal" ? "bg-white text-slate-900 shadow-sm" : "text-slate-600 hover:text-slate-900"
+                        )}
+                      >
+                        Tunggal
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setRoll({ ...roll, mode: "rentang" })}
+                        className={cn(
+                          "py-1.5 px-2 rounded-md font-semibold text-[11px] transition-all",
+                          roll.mode === "rentang" ? "bg-white text-slate-900 shadow-sm" : "text-slate-600 hover:text-slate-900"
+                        )}
+                      >
+                        Rentang Waktu
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setRoll({ ...roll, mode: "seterusnya" })}
+                        className={cn(
+                          "py-1.5 px-2 rounded-md font-semibold text-[11px] transition-all",
+                          roll.mode === "seterusnya" ? "bg-white text-slate-900 shadow-sm" : "text-slate-600 hover:text-slate-900"
+                        )}
+                      >
+                        Seterusnya
+                      </button>
+                    </div>
+                  </div>
                 </div>
-                <div className="space-y-1.5">
-                  <Label className="text-xs font-bold text-slate-700">Tanggal Mulai Penempatan</Label>
-                  <Input
-                    type="date"
-                    value={roll.start_date}
-                    onChange={(e) => setRoll({ ...roll, start_date: e.target.value })}
-                    data-testid="roll-date"
-                    className="h-9 bg-white cursor-pointer"
-                  />
-                </div>
+
+                {/* Date range inputs and quick presets */}
+                {roll.mode === "rentang" && (
+                  <div className="space-y-2 pt-1 border-t border-slate-200/60">
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                      <div className="space-y-1">
+                        <Label className="text-[11px] font-semibold text-slate-600">Tanggal Mulai Penempatan</Label>
+                        <Input
+                          type="date"
+                          value={roll.start_date}
+                          onChange={(e) => setRoll({ ...roll, start_date: e.target.value })}
+                          data-testid="roll-date"
+                          className="h-8 bg-white cursor-pointer text-xs"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-[11px] font-semibold text-slate-600">Tanggal Selesai Penempatan</Label>
+                        <Input
+                          type="date"
+                          value={roll.end_date}
+                          onChange={(e) => setRoll({ ...roll, end_date: e.target.value })}
+                          className="h-8 bg-white cursor-pointer text-xs"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Quick preset buttons */}
+                    <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                      <span className="text-[11px] text-slate-500 font-medium">Preset Cepat:</span>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setRoll({ ...roll, end_date: addMonthsToDate(roll.start_date, 3) })}
+                        className="h-6 text-[11px] px-2 bg-white hover:bg-slate-100 text-slate-700 border-slate-300"
+                      >
+                        +3 Bulan (Triwulan)
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setRoll({ ...roll, end_date: addMonthsToDate(roll.start_date, 1) })}
+                        className="h-6 text-[11px] px-2 bg-white hover:bg-slate-100 text-slate-700 border-slate-300"
+                      >
+                        +1 Bulan
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setRoll({ ...roll, end_date: addMonthsToDate(roll.start_date, 6) })}
+                        className="h-6 text-[11px] px-2 bg-white hover:bg-slate-100 text-slate-700 border-slate-300"
+                      >
+                        +6 Bulan
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setRoll({ ...roll, end_date: addMonthsToDate(roll.start_date, 12) })}
+                        className="h-6 text-[11px] px-2 bg-white hover:bg-slate-100 text-slate-700 border-slate-300"
+                      >
+                        +1 Tahun
+                      </Button>
+                    </div>
+                  </div>
+                )}
+
+                {roll.mode === "tunggal" && (
+                  <div className="pt-1 border-t border-slate-200/60">
+                    <div className="sm:w-1/2 space-y-1">
+                      <Label className="text-[11px] font-semibold text-slate-600">Tanggal Penempatan (1 Hari Saja)</Label>
+                      <Input
+                        type="date"
+                        value={roll.start_date}
+                        onChange={(e) => setRoll({ ...roll, start_date: e.target.value })}
+                        data-testid="roll-date"
+                        className="h-8 bg-white cursor-pointer text-xs"
+                      />
+                    </div>
+                    <p className="text-[11px] text-red-700 pt-3">
+                      Berlaku khusus tanggal <b>{formatDateId(roll.start_date)}</b>. Ideal untuk pergantian tugas harian tanpa mengubah jadwal sebelum/sesudahnya.
+                    </p>
+                  </div>
+                )}
+
+                {roll.mode === "seterusnya" && (
+                  <div className="pt-1 border-t border-slate-200/60">
+                    <div className="sm:w-1/2 space-y-1">
+                      <Label className="text-[11px] font-semibold text-slate-600">Tanggal Mulai Penempatan</Label>
+                      <Input
+                        type="date"
+                        value={roll.start_date}
+                        onChange={(e) => setRoll({ ...roll, start_date: e.target.value })}
+                        data-testid="roll-date"
+                        className="h-8 bg-white cursor-pointer text-xs"
+                      />
+                    </div>
+                    <p className="text-[11px] text-slate-600 pt-1">
+                      Berlaku mulai <b>{formatDateId(roll.start_date)}</b> seterusnya tanpa batas waktu akhir.
+                    </p>
+                  </div>
+                )}
               </div>
 
               {/* Selected Employees Area (Chips / Tags) */}
@@ -606,9 +1012,15 @@ export default function ManajemenRegu() {
                 </div>
               </div>
 
-              {/* Warning note */}
-              <p className="rounded-lg bg-amber-50 p-2.5 text-xs text-amber-700">
-                ⚠️ Penempatan ini berlaku mulai {roll.start_date}. Histori penempatan dan absensi sebelum tanggal tersebut TIDAK akan berubah.<br></br>Penempatan sebelumnya untuk pegawai terpilih akan otomatis ditutup sehari sebelum tanggal ini.
+              {/* Warning note dinamis sesuai mode penempatan */}
+              <p className="rounded-lg bg-sky-50 p-2.5 text-xs text-sky-800 border border-sky-200">
+                {roll.mode === "tunggal" ? (
+                  <>📌 <b>Tanggal Tunggal:</b> Penempatan berlaku khusus pada <b>{formatDateId(roll.start_date)}</b>. Penempatan sebelum dan sesudah tanggal ini tidak terpengaruh.</>
+                ) : roll.mode === "rentang" ? (
+                  <>📌 <b>Rentang Waktu:</b> Penempatan berlaku dari <b>{formatDateId(roll.start_date)}</b> s/d <b>{formatDateId(roll.end_date || roll.start_date)}</b>. Sistem otomatis menyesuaikan riwayat penempatan tanpa bentrok.</>
+                ) : (
+                  <>📌 <b>Seterusnya:</b> Penempatan berlaku mulai <b>{formatDateId(roll.start_date)}</b> seterusnya. Penempatan sebelumnya akan ditutup sehari sebelum tanggal ini.</>
+                )}
               </p>
             </div>
           )}

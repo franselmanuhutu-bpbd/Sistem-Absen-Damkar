@@ -23,10 +23,13 @@ export default function InputAbsensi() {
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    api.get("/teams").then((r) => {
-      setTeams(r.data);
-      if (r.data[0]) setTeamId(r.data[0].id);
-    });
+    api
+      .get("/teams")
+      .then((r) => {
+        setTeams(r.data);
+        if (r.data[0]) setTeamId(r.data[0].id);
+      })
+      .catch((e) => toast.error(apiError(e)));
   }, []);
 
   const loadRoster = useCallback(() => {
@@ -36,6 +39,7 @@ export default function InputAbsensi() {
     api
       .get("/attendance/roster", { params: { date, team_id: teamId } })
       .then((r) => setRoster(r.data))
+      .catch((e) => toast.error(apiError(e)))
       .finally(() => setLoading(false));
   }, [teamId, date]);
 

@@ -89,7 +89,7 @@ export default function LaporanExport() {
   };
 
   useEffect(() => {
-    api.get("/teams").then((r) => setTeams(r.data));
+    api.get("/teams").then((r) => setTeams(r.data)).catch(() => {});
     if (isAdmin) {
       loadBackupStatus();
       checkPushSubscription();

@@ -41,10 +41,21 @@ class AssignmentIn(BaseModel):
 
 
 class BatchAssignmentIn(BaseModel):
+    # Model untuk penempatan massal beberapa pegawai ke satu regu
     employee_ids: List[str]
     team_id: str
     start_date: str
     end_date: Optional[str] = None
+
+
+class ResetAssignmentsIn(BaseModel):
+    # Model untuk reset penempatan regu dengan fleksibilitas tanggal
+    mode: str = "all"  # Opsi mode: "single" (1 hari), "range" (rentang tanggal), "all" (semua tanggal)
+    date: Optional[str] = None  # Tanggal acuan jika mode == "single" (format YYYY-MM-DD)
+    start_date: Optional[str] = None  # Tanggal mulai jika mode == "range" (format YYYY-MM-DD)
+    end_date: Optional[str] = None  # Tanggal akhir jika mode == "range" (format YYYY-MM-DD)
+    team_id: Optional[str] = None  # ID regu spesifik yang ingin direset, atau None untuk semua regu
+    reset_attendance_teams: bool = True  # Apakah kolom team_id di data absensi terkait ikut dikosongkan
 
 
 class CommanderIn(BaseModel):

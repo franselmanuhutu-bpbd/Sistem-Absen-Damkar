@@ -54,7 +54,7 @@ export default function RekapPeriode() {
 
   const totalPeriodDays = getDaysInPeriod(start, end);
 
-  useEffect(() => { api.get("/teams").then((r) => setTeams(r.data)); }, []);
+  useEffect(() => { api.get("/teams").then((r) => setTeams(r.data)).catch((e) => toast.error(apiError(e))); }, []);
 
   const applyQuick = (k) => {
     setQuick(k);

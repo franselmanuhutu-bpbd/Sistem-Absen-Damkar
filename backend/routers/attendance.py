@@ -15,36 +15,39 @@ router = APIRouter(tags=["Attendance"])
 @router.get("/attendance/roster")
 async def attendance_roster(date: str, team_id: str, user: dict = Depends(get_current_user)):
     db = await get_db()
+    # Resolusi penempatan regu aktif pada tanggal yang diminta
     team_map = await resolve_teams_for_date(date)
-    today_team_map = (
-        await resolve_teams_for_date(_date.today().isoformat())
-        if date != _date.today().isoformat()
-        else team_map
-    )
 
     rec_res = await db.table("attendance").select("*").eq("date", date).execute()
     records = rec_res.data or []
     status_map = {r["employee_id"]: r["status"] for r in records}
+    # Kumpulkan ID pegawai dari absensi dan penempatan regu aktif
     att_team_eids = {r["employee_id"] for r in records if r.get("team_id") == team_id}
-
     assigned_eids = {eid for eid, tid in team_map.items() if tid == team_id}
-    today_eids = {eid for eid, tid in today_team_map.items() if tid == team_id}
 
-    if att_team_eids:
-        target_ids = att_team_eids
-    elif assigned_eids:
+    # PRIORITAS SUMBER KEBENARAN ROSTER REGU:
+    # 1. assigned_eids: Anggota yang ditempatkan di regu ini pada tanggal tersebut (Single Source of Truth)
+    # 2. att_team_eids: Fallback jika tabel penempatan kosong pada tanggal historis terkait
+    # Jika tidak ada penempatan (misalnya setelah di-reset atau belum ditempatkan), kembalikan daftar kosong.
+    # PENTING: JANGAN fallback ke today_eids agar tanggal yang di-reset tidak menampilkan anggota hari ini.
+    if assigned_eids:
         target_ids = assigned_eids
+    elif att_team_eids:
+        target_ids = att_team_eids
     else:
-        target_ids = today_eids
+        target_ids = set()
 
     if not target_ids:
         return []
 
     emps_res = await db.table("employees").select("*").in_("id", list(target_ids)).eq("status", "ACTIVE").order("no").execute()
     emps = emps_res.data or []
+
+    # Resolusi komandan regu pada tanggal tersebut
     cid = await resolve_commander_for_date(team_id, date)
-    if not cid and date != _date.today().isoformat():
-        cid = await resolve_commander_for_date(team_id, _date.today().isoformat())
+    # Komandan regu hanya sah jika yang bersangkutan merupakan anggota aktif di regu ini pada tanggal tersebut
+    if cid and cid not in target_ids:
+        cid = None
 
     for e in emps:
         e["status"] = status_map.get(e["id"])
@@ -57,12 +60,8 @@ async def batch_attendance(body: BatchAttendanceIn, user: dict = Depends(require
     if body.status not in STATUSES:
         raise HTTPException(status_code=400, detail="Status tidak valid")
     db = await get_db()
+    # Resolusi penempatan regu aktif pada tanggal absensi yang diinput
     team_map = await resolve_teams_for_date(body.date)
-    today_team_map = (
-        await resolve_teams_for_date(_date.today().isoformat())
-        if body.date != _date.today().isoformat()
-        else team_map
-    )
     count = 0
     for eid in body.employee_ids:
         existing_res = await db.table("attendance").select("*").eq("employee_id", eid).eq("date", body.date).execute()
@@ -70,7 +69,8 @@ async def batch_attendance(body: BatchAttendanceIn, user: dict = Depends(require
         old = existing["status"] if existing else None
         if old == body.status:
             continue
-        effective_team_id = team_map.get(eid) or (existing.get("team_id") if existing else None) or today_team_map.get(eid)
+        # Tentukan regu efektif pegawai pada tanggal absensi (tanpa fallback ke hari ini)
+        effective_team_id = team_map.get(eid) or (existing.get("team_id") if existing else None)
         doc = {
             "employee_id": eid,
             "date": body.date,

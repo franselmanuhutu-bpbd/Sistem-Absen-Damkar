@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import api from "@/lib/api";
+import api, { apiError } from "@/lib/api";
+import { toast } from "sonner";
 import { STATUSES, STATUS_CONFIG } from "@/lib/constants";
 import { StatusBadge } from "@/components/StatusBadge";
 import { Card } from "@/components/ui/card";
@@ -21,7 +22,7 @@ export default function Kalender() {
   const [activeDay, setActiveDay] = useState("");
 
   useEffect(() => {
-    api.get("/teams").then((r) => setTeams(r.data));
+    api.get("/teams").then((r) => setTeams(r.data)).catch((e) => toast.error(apiError(e)));
   }, []);
 
   useEffect(() => {
@@ -31,6 +32,7 @@ export default function Kalender() {
     api
       .get("/calendar", { params })
       .then((r) => setData(r.data))
+      .catch((e) => toast.error(apiError(e)))
       .finally(() => setLoading(false));
   }, [month, teamId]);
 
@@ -38,10 +40,13 @@ export default function Kalender() {
     setActiveDay(dstr);
     const params: Record<string, string> = { date: dstr };
     if (teamId !== "all") params.team_id = teamId;
-    api.get("/attendance/day", { params }).then((r) => {
-      setDetail(r.data);
-      setOpen(true);
-    });
+    api
+      .get("/attendance/day", { params })
+      .then((r) => {
+        setDetail(r.data);
+        setOpen(true);
+      })
+      .catch((e) => toast.error(apiError(e)));
   };
 
   const [y, m] = month.split("-").map(Number);

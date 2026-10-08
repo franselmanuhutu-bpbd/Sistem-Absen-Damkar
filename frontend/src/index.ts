@@ -7,15 +7,26 @@ const BACKEND_URL = process.env.BACKEND_URL || "http://localhost:8000";
 const server = serve({
   port: PORT,
   routes: {
-    // Proxy API requests to backend
+    // Proxy API requests to backend dengan perlindungan error koneksi
     "/api/*": async (req) => {
       const url = new URL(req.url);
       const targetUrl = `${BACKEND_URL}${url.pathname}${url.search}`;
-      return await fetch(targetUrl, {
-        method: req.method,
-        headers: req.headers,
-        body: req.body,
-      });
+      try {
+        return await fetch(targetUrl, {
+          method: req.method,
+          headers: req.headers,
+          body: req.body,
+        });
+      } catch (err: any) {
+        console.error(`[Proxy Error] Gagal terhubung ke ${targetUrl}:`, err?.message || err);
+        return new Response(
+          JSON.stringify({ detail: "Koneksi ke backend server lambat atau terputus." }),
+          {
+            status: 503,
+            headers: { "Content-Type": "application/json" },
+          }
+        );
+      }
     },
 
     // Service worker

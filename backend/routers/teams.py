@@ -89,36 +89,48 @@ async def team_detail(team_id: str, date: str = None, user: dict = Depends(get_c
     if not team_res.data:
         raise HTTPException(status_code=404, detail="Regu tidak ditemukan")
     team = team_res.data[0]
+    # Resolusi penempatan regu aktif pada tanggal acuan 'ref'
     team_map = await resolve_teams_for_date(ref)
-    today_team_map = (
-        await resolve_teams_for_date(_date.today().isoformat())
-        if ref != _date.today().isoformat()
-        else team_map
-    )
 
+    # Ambil catatan absensi untuk tanggal dan regu yang bersangkutan jika ada
     att_res = await db.table("attendance").select("employee_id, team_id").eq("date", ref).eq("team_id", team_id).execute()
     att_eids = {r["employee_id"] for r in (att_res.data or []) if r.get("employee_id")}
 
+    # Kumpulan ID pegawai yang ditempatkan di regu ini pada tanggal ref
     assigned_eids = {eid for eid, tid in team_map.items() if tid == team_id}
-    today_eids = {eid for eid, tid in today_team_map.items() if tid == team_id}
-    if att_eids:
-        target_ids = att_eids
-    elif assigned_eids:
+
+    # PRIORITAS SUMBER ANGGOTA REGU PADA TANGGAL ACUAN:
+    # 1. assigned_eids: Penempatan regu aktif pada tanggal 'ref' (Single Source of Truth)
+    # 2. att_eids: Fallback ke riwayat data absensi jika tabel penempatan kosong
+    # Jika tidak ada penempatan (misalnya setelah di-reset atau belum ditempatkan), regu berstatus kosong (0 anggota).
+    # PENTING: JANGAN fallback ke today_eids karena akan membuat tanggal yang di-reset tetap menampilkan anggota hari ini.
+    if assigned_eids:
         target_ids = assigned_eids
+    elif att_eids:
+        target_ids = att_eids
     else:
-        target_ids = today_eids
+        target_ids = set()
     ids = list(target_ids)
 
+    # Ambil data pegawai aktif yang terdaftar di regu pada tanggal tersebut
     members = []
     if ids:
         members = (await db.table("employees").select("*").in_("id", ids).eq("status", "ACTIVE").order("no").limit(5000).execute()).data or []
+
+    # Resolusi komandan regu pada tanggal acuan 'ref'
     cid = await resolve_commander_for_date(team_id, ref)
-    if not cid and ref != _date.today().isoformat():
-        cid = await resolve_commander_for_date(team_id, _date.today().isoformat())
+    # Komandan regu hanya sah jika yang bersangkutan merupakan anggota aktif dalam regu pada tanggal tersebut
+    if cid and cid not in target_ids:
+        cid = None
+
+    # Ambil detail nama komandan jika ada
     cemp = (await db.table("employees").select("*").eq("id", cid).execute()).data if cid else None
     cemp_obj = cemp[0] if cemp else None
+
+    # Tandai anggota yang bertindak sebagai komandan
     for m in members:
         m["is_commander"] = (m["id"] == cid)
+
     return {"team": team, "commander": {"employee_id": cid, "nama": cemp_obj["nama"] if cemp_obj else None},
             "members": members, "date": ref}
 

@@ -25,7 +25,11 @@ export default function DataPegawai() {
 
   const load = () => {
     setLoading(true);
-    api.get("/employees", { params: { search, status: statusFilter } }).then((r) => setEmployees(r.data)).finally(() => setLoading(false));
+    api
+      .get("/employees", { params: { search, status: statusFilter } })
+      .then((r) => setEmployees(r.data))
+      .catch((e) => toast.error(apiError(e)))
+      .finally(() => setLoading(false));
   };
   useEffect(() => { const t = setTimeout(load, 300); return () => clearTimeout(t); }, [search, statusFilter]);
 
@@ -49,7 +53,10 @@ export default function DataPegawai() {
 
   const openHist = (e) => {
     setHist(e);
-    api.get(`/employees/${e.id}/assignments`).then((r) => setHistData(r.data));
+    api
+      .get(`/employees/${e.id}/assignments`)
+      .then((r) => setHistData(r.data))
+      .catch((err) => toast.error(apiError(err)));
   };
 
   const doImport = async (ev) => {

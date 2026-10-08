@@ -22,7 +22,11 @@ export default function AbsensiKasubid() {
   const load = useCallback(() => {
     setLoading(true);
     setSelected(new Set());
-    api.get("/kasubid/roster", { params: { date } }).then((r) => setRoster(r.data)).finally(() => setLoading(false));
+    api
+      .get("/kasubid/roster", { params: { date } })
+      .then((r) => setRoster(r.data))
+      .catch((e) => toast.error(apiError(e)))
+      .finally(() => setLoading(false));
   }, [date]);
   useEffect(() => { load(); }, [load]);
 

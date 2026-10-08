@@ -5,6 +5,7 @@ export const TOKEN_KEY = "damkar_token";
 
 const api: AxiosInstance = axios.create({
   baseURL: API_BASE,
+  timeout: 30000, // Batas waktu 30 detik untuk jaringan lambat
   headers: {
     "Content-Type": "application/json",
   },
@@ -62,6 +63,14 @@ export async function downloadFile(
 }
 
 export function apiError(error: any): string {
+  // Tangani kegagalan jaringan atau timeout
+  if (error?.message === "Network Error" || error?.code === "ERR_NETWORK") {
+    return "Koneksi jaringan terputus atau lambat. Silakan periksa koneksi internet Anda.";
+  }
+  if (error?.code === "ECONNABORTED" || error?.message?.includes("timeout")) {
+    return "Permintaan melebihi batas waktu (timeout). Silakan coba beberapa saat lagi.";
+  }
+
   const detail = error?.response?.data?.detail;
 
   if (typeof detail === "string") {
