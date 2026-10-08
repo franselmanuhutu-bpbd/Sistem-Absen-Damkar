@@ -624,8 +624,8 @@ export default function ManajemenRegu() {
                 </button>
               )}
             </div>
-            <Badge className="gap-1.5 bg-amber-100 text-amber-700 hover:bg-amber-100">
-              <Crown className="h-3.5 w-3.5" /> Komandan: {detail?.commander?.nama || "—"}
+            <Badge className="gap-1.5 h-8 bg-amber-100 text-amber-700 hover:bg-amber-100">
+              <Crown className="mr-1.5 h-4 w-4" /> Komandan: {detail?.commander?.nama || "—"}
             </Badge>
             <Button size="sm" variant="outline" onClick={() => setCmd({ employee_id: "", start_date: selectedDate })} data-testid="set-commander-btn">
               <Crown className="mr-1.5 h-4 w-4" /> Komandan
@@ -820,7 +820,7 @@ export default function ManajemenRegu() {
                 )}
 
                 {roll.mode === "tunggal" && (
-                  <div className="pt-1 border-t border-slate-200/60">
+                  <div className="border-t border-slate-200/60">
                     <div className="sm:w-1/2 space-y-1">
                       <Label className="text-[11px] font-semibold text-slate-600">Tanggal Penempatan (1 Hari Saja)</Label>
                       <Input
@@ -885,7 +885,7 @@ export default function ManajemenRegu() {
                     Belum ada pegawai dipilih. Cari dan centang pegawai pada daftar di bawah untuk menambahkan ke regu.
                   </p>
                 ) : (
-                  <div className="flex flex-wrap gap-1.5 max-h-28 overflow-y-auto pr-1 pt-1">
+                  <div className="flex flex-wrap gap-1.5 max-h-28 overflow-y-auto pr-1">
                     {selectedRollEmployees.map((emp: any) => (
                       <span
                         key={emp.id}
@@ -910,6 +910,17 @@ export default function ManajemenRegu() {
                   </div>
                 )}
               </div>
+
+              {/* Warning note dinamis sesuai mode penempatan */}
+              <p className="rounded-lg bg-sky-50 p-1 text-xs text-sky-800 border border-sky-200">
+                {roll.mode === "tunggal" ? (
+                  <>📌 <b>Tanggal Tunggal:</b> Penempatan berlaku khusus pada <b>{formatDateId(roll.start_date)}</b>. Penempatan sebelum dan sesudah tanggal ini tidak terpengaruh.</>
+                ) : roll.mode === "rentang" ? (
+                  <>📌 <b>Rentang Waktu:</b> Penempatan berlaku dari <b>{formatDateId(roll.start_date)}</b> s/d <b>{formatDateId(roll.end_date || roll.start_date)}</b>. Sistem otomatis menyesuaikan riwayat penempatan tanpa bentrok.</>
+                ) : (
+                  <>📌 <b>Seterusnya:</b> Penempatan berlaku mulai <b>{formatDateId(roll.start_date)}</b> seterusnya. Penempatan sebelumnya akan ditutup sehari sebelum tanggal ini.</>
+                )}
+              </p>
 
               {/* Multi-Select Employee Search and Checklist */}
               <div className="rounded-xl border border-slate-200 bg-white p-3 space-y-2.5">
@@ -1052,17 +1063,6 @@ export default function ManajemenRegu() {
                   )}
                 </div>
               </div>
-
-              {/* Warning note dinamis sesuai mode penempatan */}
-              <p className="rounded-lg bg-sky-50 p-2.5 text-xs text-sky-800 border border-sky-200">
-                {roll.mode === "tunggal" ? (
-                  <>📌 <b>Tanggal Tunggal:</b> Penempatan berlaku khusus pada <b>{formatDateId(roll.start_date)}</b>. Penempatan sebelum dan sesudah tanggal ini tidak terpengaruh.</>
-                ) : roll.mode === "rentang" ? (
-                  <>📌 <b>Rentang Waktu:</b> Penempatan berlaku dari <b>{formatDateId(roll.start_date)}</b> s/d <b>{formatDateId(roll.end_date || roll.start_date)}</b>. Sistem otomatis menyesuaikan riwayat penempatan tanpa bentrok.</>
-                ) : (
-                  <>📌 <b>Seterusnya:</b> Penempatan berlaku mulai <b>{formatDateId(roll.start_date)}</b> seterusnya. Penempatan sebelumnya akan ditutup sehari sebelum tanggal ini.</>
-                )}
-              </p>
             </div>
           )}
 
