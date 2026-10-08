@@ -287,6 +287,72 @@ async def create_batch_assignment(body: BatchAssignmentIn, user: dict = Depends(
     }
 
 
+@router.post("/assignments/check-conflicts")
+async def check_assignment_conflicts(
+    body: BatchAssignmentIn,
+    user: dict = Depends(require_roles("admin", "operator"))
+):
+    """
+    Pengecekan konflik dan penimpaan (override) penempatan regu sebelum rolling disimpan.
+    Mengembalikan daftar penempatan yang bersinggungan untuk konfirmasi pengguna.
+    """
+    if not body.employee_ids:
+        return {"has_conflicts": False, "conflicts": []}
+
+    db = await get_db()
+    new_start = body.start_date
+    new_end_cap = body.end_date or "9999-12-31"
+
+    # 1. Ambil data nama regu
+    teams_res = await db.table("teams").select("id, name").execute()
+    teams_map = {t["id"]: t["name"] for t in (teams_res.data or [])}
+    target_team_name = teams_map.get(body.team_id, "Regu Tujuan")
+
+    # 2. Ambil data nama pegawai
+    emp_res = await db.table("employees").select("id, nama, nip").in_("id", body.employee_ids).execute()
+    emps_map = {e["id"]: e for e in (emp_res.data or [])}
+
+    # 3. Ambil penempatan yang sudah ada untuk pegawai yang dipilih
+    assign_res = await db.table("team_assignments").select("*").in_("employee_id", body.employee_ids).execute()
+    assignments = assign_res.data or []
+
+    conflicts = []
+    for a in assignments:
+        eid = a["employee_id"]
+        a_start = a["start_date"]
+        a_end = a.get("end_date") or "9999-12-31"
+
+        # Cek apakah interval a bersinggungan dengan rentang baru [new_start, new_end_cap]
+        if a_start <= new_end_cap and a_end >= new_start:
+            emp = emps_map.get(eid, {})
+            existing_team_name = teams_map.get(a["team_id"], "Regu Lain")
+            is_different_team = a["team_id"] != body.team_id
+
+            conflicts.append({
+                "assignment_id": a["id"],
+                "employee_id": eid,
+                "employee_nama": emp.get("nama", "Pegawai"),
+                "employee_nip": emp.get("nip", ""),
+                "existing_team_id": a["team_id"],
+                "existing_team_name": existing_team_name,
+                "existing_start_date": a["start_date"],
+                "existing_end_date": a.get("end_date"),
+                "target_team_id": body.team_id,
+                "target_team_name": target_team_name,
+                "new_start_date": body.start_date,
+                "new_end_date": body.end_date,
+                "is_different_team": is_different_team,
+            })
+
+    conflicts.sort(key=lambda x: (x["employee_nama"], x["existing_start_date"]))
+
+    return {
+        "has_conflicts": len(conflicts) > 0,
+        "conflict_count": len(conflicts),
+        "conflicts": conflicts,
+    }
+
+
 @router.delete("/assignments/{aid}")
 async def delete_assignment(aid: str, user: dict = Depends(require_roles("admin"))):
     """Menghapus satu baris penempatan regu berdasarkan ID."""

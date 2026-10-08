@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
-import { ArrowRightLeft, Flame, Star, Loader2, Pencil, Crown, History, RotateCcw, Search, X, Calendar, Clock, Sparkles } from "lucide-react";
+import { ArrowRightLeft, Flame, Star, Loader2, Pencil, Crown, History, RotateCcw, Search, X, Calendar, Clock, Sparkles, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 import { TableSkeleton } from "@/components/ui/table-skeleton";
 import { EmployeeSearchSelect } from "@/components/EmployeeSearchSelect";
@@ -81,6 +81,23 @@ export default function ManajemenRegu() {
     submitting: false,
   });
 
+  // State untuk modal konfirmasi penimpaan (override) penempatan
+  const [conflictModal, setConflictModal] = useState<{
+    open: boolean;
+    conflicts: any[];
+    confirmedIds: Set<string>;
+    targetTeamName: string;
+    newPeriodLabel: string;
+    submitting: boolean;
+  }>({
+    open: false,
+    conflicts: [],
+    confirmedIds: new Set(),
+    targetTeamName: "",
+    newPeriodLabel: "",
+    submitting: false,
+  });
+
   const isAdmin = Boolean(user && user.role === "admin");
 
   const loadTeams = () => api.get("/teams").then((r) => { setTeams(r.data); if (!activeTeam && r.data[0]) setActiveTeam(r.data[0].id); }).catch((e) => toast.error(apiError(e)));
@@ -96,7 +113,44 @@ export default function ManajemenRegu() {
   };
   useEffect(() => { if (activeTeam) loadDetail(activeTeam, selectedDate); }, [activeTeam, selectedDate]);
 
-  // Simpan penempatan anggota massal dengan fleksibilitas mode tanggal (Single date, Range date, Seterusnya)
+  // Eksekusi penempatan batch ke backend setelah konfirmasi
+  const executeBatchRoll = async (employeeIdsToAssign: string[]) => {
+    if (!roll || !employeeIdsToAssign.length) {
+      toast.warning("Tidak ada pegawai yang dipilih untuk ditempatkan.");
+      return;
+    }
+    setSubmittingRoll(true);
+    setConflictModal((prev) => ({ ...prev, submitting: true }));
+    try {
+      const finalEndDate = roll.mode === "tunggal"
+        ? roll.start_date
+        : (roll.mode === "rentang" ? (roll.end_date || null) : null);
+
+      const res = await api.post("/assignments/batch", {
+        employee_ids: employeeIdsToAssign,
+        team_id: roll.team_id,
+        start_date: roll.start_date,
+        end_date: finalEndDate,
+      });
+      const count = res.data?.count ?? employeeIdsToAssign.length;
+      const modeLabel = roll.mode === "tunggal"
+        ? `Tanggal Tunggal (${formatDateId(roll.start_date)})`
+        : (roll.mode === "rentang" ? `Rentang ${formatDateId(roll.start_date)} s/d ${formatDateId(finalEndDate!)}` : "Seterusnya");
+
+      toast.success(`${count} penempatan regu berhasil disimpan [${modeLabel}]`);
+      setConflictModal({ open: false, conflicts: [], confirmedIds: new Set(), targetTeamName: "", newPeriodLabel: "", submitting: false });
+      setRoll(null);
+      loadDetail(activeTeam, selectedDate);
+      loadEmp(selectedDate);
+    } catch (e) {
+      toast.error(apiError(e));
+    } finally {
+      setSubmittingRoll(false);
+      setConflictModal((prev) => ({ ...prev, submitting: false }));
+    }
+  };
+
+  // Simpan penempatan anggota massal: Cek konflik & konfirmasi penimpaan terlebih dahulu
   const submitRoll = async () => {
     if (!roll?.employee_ids?.length || !roll?.team_id) {
       toast.error("Pilih setidaknya satu pegawai dan tentukan regu tujuan.");
@@ -108,29 +162,42 @@ export default function ManajemenRegu() {
     }
     setSubmittingRoll(true);
     try {
-      // Tentukan tanggal akhir sesuai mode yang dipilih
       const finalEndDate = roll.mode === "tunggal"
         ? roll.start_date
         : (roll.mode === "rentang" ? (roll.end_date || null) : null);
 
-      const res = await api.post("/assignments/batch", {
+      // Cek apakah ada pegawai yang sudah memiliki penempatan pada interval ini
+      const conflictRes = await api.post("/assignments/check-conflicts", {
         employee_ids: roll.employee_ids,
         team_id: roll.team_id,
         start_date: roll.start_date,
         end_date: finalEndDate,
       });
-      const count = res.data?.count ?? roll.employee_ids.length;
-      const modeLabel = roll.mode === "tunggal"
-        ? `Tanggal Tunggal (${formatDateId(roll.start_date)})`
-        : (roll.mode === "rentang" ? `Rentang ${formatDateId(roll.start_date)} s/d ${formatDateId(finalEndDate!)}` : "Seterusnya");
 
-      toast.success(`${count} penempatan regu berhasil disimpan [${modeLabel}]`);
-      setRoll(null);
-      loadDetail(activeTeam, selectedDate);
-      loadEmp(selectedDate);
+      if (conflictRes.data?.has_conflicts) {
+        const targetTeamObj = teams.find((t) => t.id === roll.team_id);
+        const targetTeamName = targetTeamObj?.name || "Regu Tujuan";
+        const newPeriodLabel = roll.mode === "tunggal"
+          ? `${formatDateId(roll.start_date)} (1 hari)`
+          : (roll.mode === "rentang" ? `${formatDateId(roll.start_date)} s/d ${formatDateId(finalEndDate!)}` : `Mulai ${formatDateId(roll.start_date)} seterusnya`);
+
+        // Tampilkan dialog konfirmasi penimpaan (override)
+        setConflictModal({
+          open: true,
+          conflicts: conflictRes.data.conflicts,
+          confirmedIds: new Set(roll.employee_ids),
+          targetTeamName,
+          newPeriodLabel,
+          submitting: false,
+        });
+        setSubmittingRoll(false);
+        return;
+      }
+
+      // Jika tidak ada bentrok penempatan, langsung simpan
+      await executeBatchRoll(roll.employee_ids);
     } catch (e) {
       toast.error(apiError(e));
-    } finally {
       setSubmittingRoll(false);
     }
   };
@@ -1208,6 +1275,159 @@ export default function ManajemenRegu() {
               {histData.length === 0 && <tr><td colSpan={3} className="py-8 text-center text-slate-400">Belum ada riwayat.</td></tr>}
             </tbody>
           </table>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog Konfirmasi Penimpaan (Override) Penempatan Rolling */}
+      <Dialog
+        open={conflictModal.open}
+        onOpenChange={(o) => !conflictModal.submitting && setConflictModal((prev) => ({ ...prev, open: o }))}
+      >
+        <DialogContent className="max-w-2xl max-h-[85vh] flex flex-col p-6 overflow-hidden">
+          <DialogHeader className="space-y-1">
+            <div className="flex items-center gap-2.5 text-amber-600">
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-amber-100">
+                <AlertTriangle className="h-5 w-5" />
+              </div>
+              <div>
+                <DialogTitle className="text-lg font-bold text-slate-900">
+                  Konfirmasi Penimpaan (Override) Penempatan
+                </DialogTitle>
+                <DialogDescription className="text-xs text-slate-500">
+                  1 pegawai hanya dapat ditempatkan di 1 regu pada tanggal yang sama. Pegawai berikut sudah memiliki penempatan regu pada rentang tanggal yang dipilih:
+                </DialogDescription>
+              </div>
+            </div>
+          </DialogHeader>
+
+          {/* Banner Target Regu & Periode Baru */}
+          <div className="rounded-lg bg-amber-50/80 border border-amber-200/80 p-3 text-xs space-y-1">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <span className="text-slate-500 font-medium">Regu Tujuan: </span>
+                <span className="font-bold text-slate-900">{conflictModal.targetTeamName}</span>
+              </div>
+              <div>
+                <span className="text-slate-500 font-medium">Periode Baru: </span>
+                <span className="font-bold text-slate-900">{conflictModal.newPeriodLabel}</span>
+              </div>
+            </div>
+            <p className="text-[11px] text-amber-800">
+              Centang pegawai yang ingin Anda setujui untuk ditimpa. Pegawai yang tidak dicentang akan dilewati dan penempatan lamanya tetap dipertahankan.
+            </p>
+          </div>
+
+          {/* Daftar Konflik Pegawai */}
+          <div className="flex-1 overflow-y-auto rounded-lg border border-slate-200 min-h-[160px] max-h-[38vh]">
+            <table className="w-full text-xs">
+              <thead className="sticky top-0 bg-slate-50 border-b border-slate-200 text-slate-500 uppercase tracking-wide">
+                <tr>
+                  <th className="w-10 px-3 py-2 text-center">
+                    <Checkbox
+                      checked={
+                        conflictModal.conflicts.length > 0 &&
+                        conflictModal.conflicts.every((c) => conflictModal.confirmedIds.has(c.employee_id))
+                      }
+                      onCheckedChange={(checked) => {
+                        setConflictModal((prev) => {
+                          const next = new Set(prev.confirmedIds);
+                          prev.conflicts.forEach((c) => {
+                            if (checked) next.add(c.employee_id);
+                            else next.delete(c.employee_id);
+                          });
+                          return { ...prev, confirmedIds: next };
+                        });
+                      }}
+                      className="h-4 w-4"
+                    />
+                  </th>
+                  <th className="px-3 py-2 text-left">Pegawai</th>
+                  <th className="px-3 py-2 text-left">Penempatan Saat Ini (Tertimpa)</th>
+                  <th className="px-3 py-2 text-left">Status</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {conflictModal.conflicts.map((c, i) => {
+                  const isChecked = conflictModal.confirmedIds.has(c.employee_id);
+                  const existingRange = c.existing_end_date
+                    ? `${formatDateId(c.existing_start_date)} s/d ${formatDateId(c.existing_end_date)}`
+                    : `Mulai ${formatDateId(c.existing_start_date)} (Seterusnya)`;
+
+                  return (
+                    <tr
+                      key={c.assignment_id || i}
+                      className={cn(
+                        "transition-colors",
+                        isChecked ? "bg-amber-50/30 hover:bg-amber-50/50" : "bg-slate-50/60 opacity-60"
+                      )}
+                    >
+                      <td className="px-3 py-2.5 text-center">
+                        <Checkbox
+                          checked={isChecked}
+                          onCheckedChange={(checked) => {
+                            setConflictModal((prev) => {
+                              const next = new Set(prev.confirmedIds);
+                              if (checked) next.add(c.employee_id);
+                              else next.delete(c.employee_id);
+                              return { ...prev, confirmedIds: next };
+                            });
+                          }}
+                          className="h-4 w-4"
+                        />
+                      </td>
+                      <td className="px-3 py-2.5">
+                        <p className="font-semibold text-slate-800">{c.employee_nama}</p>
+                        <p className="font-mono text-[10px] text-slate-400">{c.employee_nip || "-"}</p>
+                      </td>
+                      <td className="px-3 py-2.5">
+                        <div className="flex flex-col gap-0.5">
+                          <span className="font-bold text-amber-800 inline-flex items-center gap-1">
+                            {c.existing_team_name}
+                          </span>
+                          <span className="text-[11px] text-slate-500">{existingRange}</span>
+                        </div>
+                      </td>
+                      <td className="px-3 py-2.5">
+                        {isChecked ? (
+                          <span className="inline-flex rounded-lg bg-amber-100 px-2 py-2 text-[11px] font-bold text-amber-800">
+                            Akan Ditimpa ke {conflictModal.targetTeamName}
+                          </span>
+                        ) : (
+                          <span className="inline-flex rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-500">
+                            Dilewati (Tetap)
+                          </span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+
+          <DialogFooter className="mt-3 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+            <Button
+              type="button"
+              variant="outline"
+              disabled={conflictModal.submitting}
+              onClick={() => setConflictModal((prev) => ({ ...prev, open: false }))}
+            >
+              Batal
+            </Button>
+            <Button
+              type="button"
+              disabled={conflictModal.submitting || conflictModal.confirmedIds.size === 0}
+              onClick={() => executeBatchRoll(Array.from(conflictModal.confirmedIds))}
+              className="bg-amber-600 hover:bg-amber-700 text-white gap-2 font-semibold"
+            >
+              {conflictModal.submitting ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <ArrowRightLeft className="h-4 w-4" />
+              )}
+              Ya, Timpa Penempatan ({conflictModal.confirmedIds.size} Pegawai)
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

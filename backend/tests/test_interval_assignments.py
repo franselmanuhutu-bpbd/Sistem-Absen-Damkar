@@ -120,6 +120,62 @@ async def _async_test_reset():
         assert "2026-10-15" in reset_res["scope"]
 
 
+def test_check_assignment_conflicts():
+    """Uji coba pengecekan konflik penimpaan penempatan regu."""
+    asyncio.run(_async_test_check_conflicts())
+
+
+async def _async_test_check_conflicts():
+    from routers.assignments import check_assignment_conflicts
+    mock_db = MagicMock()
+    user = {"email": "admin@example.com", "name": "Admin", "role": "admin"}
+
+    def mock_table(name):
+        tbl = MagicMock()
+        if name == "teams":
+            tbl.select.return_value.execute = AsyncMock(
+                return_value=MagicMock(data=[
+                    {"id": "team-1", "name": "Regu 1"},
+                    {"id": "team-2", "name": "Regu 2"},
+                ])
+            )
+        elif name == "employees":
+            tbl.select.return_value.in_.return_value.execute = AsyncMock(
+                return_value=MagicMock(data=[
+                    {"id": "emp-1", "nama": "Staff A", "nip": "12345"},
+                ])
+            )
+        elif name == "team_assignments":
+            tbl.select.return_value.in_.return_value.execute = AsyncMock(
+                return_value=MagicMock(data=[
+                    # Staff A sudah ada di Regu 1 pada 2026-10-08
+                    {"id": "a-1", "employee_id": "emp-1", "team_id": "team-1", "start_date": "2026-10-08", "end_date": "2026-10-08"}
+                ])
+            )
+        return tbl
+
+    mock_db.table.side_effect = mock_table
+
+    with patch("routers.assignments.get_db", AsyncMock(return_value=mock_db)):
+        # Coba roll Staff A ke Regu 2 dari September s/d November 2026
+        res = await check_assignment_conflicts(
+            body=BatchAssignmentIn(
+                employee_ids=["emp-1"],
+                team_id="team-2",
+                start_date="2026-09-01",
+                end_date="2026-11-30"
+            ),
+            user=user
+        )
+        assert res["has_conflicts"] is True
+        assert len(res["conflicts"]) == 1
+        conflict = res["conflicts"][0]
+        assert conflict["employee_nama"] == "Staff A"
+        assert conflict["existing_team_name"] == "Regu 1"
+        assert conflict["target_team_name"] == "Regu 2"
+        assert conflict["is_different_team"] is True
+
+
 def unittest_any():
     class AnyMatcher:
         def __eq__(self, other):
