@@ -1,6 +1,6 @@
 [package]
 name = "damkar-absensi"
-version = "1.0.0"
+version = "1.0.1"
 description = "Sistem Absensi DAMKAR Mimika"
 authors = ["you"]
 license = ""
