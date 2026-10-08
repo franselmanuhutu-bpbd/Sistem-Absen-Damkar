@@ -4,6 +4,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/context/AuthContext";
 import { Layout } from "@/components/Layout";
 import { Toaster } from "@/components/ui/sonner";
+import { UpdateProvider } from "@/components/UpdateChecker";
 import Login from "@/pages/Login";
 import Dashboard from "@/pages/Dashboard";
 import InputAbsensi from "@/pages/InputAbsensi";
@@ -43,30 +44,32 @@ function Protected({ children, roles }: ProtectedProps) {
 export function App() {
   return (
     <AuthProvider>
-      <BrowserRouter>
-        <NavigationGuardProvider>
-          <Routes>
-          <Route path="/login" element={<Login />} />
-          <Route path="/" element={<Navigate to="/dashboard" replace />} />
-          <Route path="/dashboard" element={<Protected><Dashboard /></Protected>} />
-          <Route path="/input-absensi" element={<Protected roles={["admin", "operator"]}><InputAbsensi /></Protected>} />
-          <Route path="/absensi-kasubid" element={<Protected roles={["admin", "operator"]}><AbsensiKasubid /></Protected>} />
-          <Route path="/pengaturan-kasubid" element={<Protected roles={["admin"]}><PengaturanKasubid /></Protected>} />
-          <Route path="/kalender" element={<Protected><Kalender /></Protected>} />
-          <Route path="/rekap-bulanan" element={<Protected><RekapBulanan /></Protected>} />
-          <Route path="/rekap-periode" element={<Protected><RekapPeriode /></Protected>} />
-          <Route path="/rekap-kasubid" element={<Protected roles={["admin", "operator", "viewer", "kasubid"]}><RekapKasubid /></Protected>} />
-          <Route path="/absensi-saya" element={<Protected roles={["staff", "kasubid", "komandan", "operator"]}><AbsensiSaya /></Protected>} />
-          <Route path="/data-pegawai" element={<Protected roles={["admin", "operator"]}><DataPegawai /></Protected>} />
-          <Route path="/manajemen-regu" element={<Protected roles={["admin", "operator"]}><ManajemenRegu /></Protected>} />
-          <Route path="/laporan-export" element={<Protected><LaporanExport /></Protected>} />
-          <Route path="/user-management" element={<Protected roles={["admin"]}><UserManagement /></Protected>} />
-          <Route path="/audit-log" element={<Protected roles={["admin"]}><AuditLog /></Protected>} />
-          <Route path="*" element={<Navigate to="/dashboard" replace />} />
-        </Routes>
-        </NavigationGuardProvider>
-      </BrowserRouter>
-      <Toaster position="top-right" richColors />
+      <UpdateProvider>
+        <BrowserRouter>
+          <NavigationGuardProvider>
+            <Routes>
+              <Route path="/login" element={<Login />} />
+              <Route path="/" element={<Navigate to="/dashboard" replace />} />
+              <Route path="/dashboard" element={<Protected><Dashboard /></Protected>} />
+              <Route path="/input-absensi" element={<Protected roles={["admin", "operator"]}><InputAbsensi /></Protected>} />
+              <Route path="/absensi-kasubid" element={<Protected roles={["admin", "operator"]}><AbsensiKasubid /></Protected>} />
+              <Route path="/pengaturan-kasubid" element={<Protected roles={["admin"]}><PengaturanKasubid /></Protected>} />
+              <Route path="/kalender" element={<Protected><Kalender /></Protected>} />
+              <Route path="/rekap-bulanan" element={<Protected><RekapBulanan /></Protected>} />
+              <Route path="/rekap-periode" element={<Protected><RekapPeriode /></Protected>} />
+              <Route path="/rekap-kasubid" element={<Protected roles={["admin", "operator", "viewer", "kasubid"]}><RekapKasubid /></Protected>} />
+              <Route path="/absensi-saya" element={<Protected roles={["staff", "kasubid", "komandan", "operator"]}><AbsensiSaya /></Protected>} />
+              <Route path="/data-pegawai" element={<Protected roles={["admin", "operator"]}><DataPegawai /></Protected>} />
+              <Route path="/manajemen-regu" element={<Protected roles={["admin", "operator"]}><ManajemenRegu /></Protected>} />
+              <Route path="/laporan-export" element={<Protected><LaporanExport /></Protected>} />
+              <Route path="/user-management" element={<Protected roles={["admin"]}><UserManagement /></Protected>} />
+              <Route path="/audit-log" element={<Protected roles={["admin"]}><AuditLog /></Protected>} />
+              <Route path="*" element={<Navigate to="/dashboard" replace />} />
+            </Routes>
+          </NavigationGuardProvider>
+        </BrowserRouter>
+        <Toaster position="top-right" richColors />
+      </UpdateProvider>
     </AuthProvider>
   );
 }

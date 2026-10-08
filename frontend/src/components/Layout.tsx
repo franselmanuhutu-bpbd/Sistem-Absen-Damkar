@@ -23,11 +23,15 @@ import {
   Settings,
   PanelLeftClose,
   PanelLeftOpen,
+  Sparkles,
+  RefreshCw,
   type LucideIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { NetworkStatusBadge } from "./NetworkStatusBadge";
 import { motion, AnimatePresence } from "framer-motion";
+import { isTauriEnvironment } from "@/lib/api";
+import { useUpdater } from "@/components/UpdateChecker";
 
 type NavItem =
   | {
@@ -65,6 +69,7 @@ const NAV: NavItem[] = [
 export function Layout({ children }: { children: ReactNode }) {
   const { user, logout } = useAuth();
   const { confirmAction } = useNavigationGuard();
+  const { updateInfo, isChecking, checkForUpdates, setIsDialogOpen } = useUpdater();
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const [collapsed, setCollapsed] = useState<boolean>(() => {
@@ -238,6 +243,35 @@ export function Layout({ children }: { children: ReactNode }) {
                 </span>
               </div>
 
+              {isTauriEnvironment() && (
+                updateInfo?.available ? (
+                  <motion.button
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    onClick={() => setIsDialogOpen(true)}
+                    className="relative flex h-9 w-9 items-center justify-center rounded-lg bg-amber-500/20 text-amber-300 border border-amber-500/40 hover:bg-amber-500/30 transition-colors animate-pulse"
+                    title={`Pembaruan v${updateInfo.version} tersedia! Klik untuk memasang.`}
+                  >
+                    <Sparkles className="h-4 w-4 text-amber-400" />
+                    <span className="absolute -top-1 -right-1 flex h-2.5 w-2.5">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-amber-500"></span>
+                    </span>
+                  </motion.button>
+                ) : (
+                  <motion.button
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    onClick={() => checkForUpdates(false)}
+                    disabled={isChecking}
+                    className="flex h-9 w-9 items-center justify-center rounded-lg text-slate-400 hover:bg-white/10 hover:text-slate-200 transition-colors disabled:opacity-50"
+                    title="Periksa Pembaruan Sistem"
+                  >
+                    <RefreshCw className={`h-4 w-4 ${isChecking ? "animate-spin text-amber-400" : ""}`} />
+                  </motion.button>
+                )
+              )}
+
               <motion.button
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
@@ -272,6 +306,31 @@ export function Layout({ children }: { children: ReactNode }) {
                 transition={{ duration: 0.2, delay: 0.04, ease: "easeOut" }}
                 className="flex items-center gap-1"
               >
+                {isTauriEnvironment() && (
+                  updateInfo?.available ? (
+                    <Button
+                      type="button"
+                      onClick={() => setIsDialogOpen(true)}
+                      className="justify-start gap-1.5 bg-amber-500/20 text-amber-300 hover:bg-amber-500/30 border border-amber-500/40 h-8 px-2 text-xs font-semibold animate-pulse"
+                      title={`Pembaruan v${updateInfo.version} tersedia! Klik untuk memasang.`}
+                    >
+                      <Sparkles className="h-3.5 w-3.5 text-amber-400" /> Update v{updateInfo.version}
+                    </Button>
+                  ) : (
+                    <Button
+                      type="button"
+                      onClick={() => checkForUpdates(false)}
+                      disabled={isChecking}
+                      variant="ghost"
+                      size="sm"
+                      className="justify-start gap-1.5 text-slate-400 hover:bg-white/5 hover:text-slate-200 h-8 px-2 text-xs disabled:opacity-50"
+                      title="Periksa apakah ada pembaruan versi baru di GitHub"
+                    >
+                      <RefreshCw className={`h-3 w-3 ${isChecking ? "animate-spin text-amber-400" : ""}`} />
+                      {isChecking ? "Memeriksa..." : "Periksa Update"}
+                    </Button>
+                  )
+                )}
                 <Button
                   data-testid="logout-btn"
                   onClick={handleLogout}
