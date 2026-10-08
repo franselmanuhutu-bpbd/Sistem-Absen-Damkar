@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Download, RefreshCw, Sparkles, CheckCircle2 } from "lucide-react";
 
 interface UpdateContextType {
+  currentVersion: string;
   updateInfo: any;
   isChecking: boolean;
   isDownloading: boolean;
@@ -25,10 +26,33 @@ interface UpdateContextType {
 
 const UpdateContext = createContext<UpdateContextType | null>(null);
 
+let cachedAppVersion = "";
+
+/**
+ * Mengambil versi aplikasi desktop secara dinamis dari binary Tauri.
+ * Mengembalikan string format "v1.0.1", atau string kosong jika di browser.
+ */
+export async function getAppVersion(): Promise<string> {
+  if (cachedAppVersion) return cachedAppVersion;
+  if (!isTauriEnvironment()) return "";
+  try {
+    const { getVersion } = await import("@tauri-apps/api/app");
+    const v = await getVersion();
+    if (v) {
+      cachedAppVersion = v.startsWith("v") ? v : `v${v}`;
+      return cachedAppVersion;
+    }
+  } catch (err) {
+    console.warn("[Auto-Updater] Gagal membaca versi aplikasi:", err);
+  }
+  return "";
+}
+
 export function useUpdater() {
   const context = useContext(UpdateContext);
   if (!context) {
     return {
+      currentVersion: "",
       updateInfo: null,
       isChecking: false,
       isDownloading: false,
@@ -43,11 +67,20 @@ export function useUpdater() {
 }
 
 export function UpdateProvider({ children }: { children: ReactNode }) {
+  const [currentVersion, setCurrentVersion] = useState<string>("");
   const [updateInfo, setUpdateInfo] = useState<any>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isChecking, setIsChecking] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
   const [progress, setProgress] = useState<number | null>(null);
+
+  // Ambil versi dinamis saat pertama kali mount
+  useEffect(() => {
+    if (!isTauriEnvironment()) return;
+    getAppVersion().then((v) => {
+      if (v) setCurrentVersion(v);
+    });
+  }, []);
 
   const checkForUpdates = useCallback(async (silent = false) => {
     if (!isTauriEnvironment()) {
@@ -58,6 +91,9 @@ export function UpdateProvider({ children }: { children: ReactNode }) {
     }
 
     setIsChecking(true);
+    const ver = cachedAppVersion || (await getAppVersion());
+    const verSuffix = ver ? ` (${ver})` : "";
+
     try {
       const { check } = await import("@tauri-apps/plugin-updater");
       const update = await check();
@@ -73,7 +109,7 @@ export function UpdateProvider({ children }: { children: ReactNode }) {
       } else {
         setUpdateInfo(null);
         if (!silent) {
-          toast.success("Aplikasi sudah menggunakan versi terbaru (v1.0.0).", {
+          toast.success(`Aplikasi sudah menggunakan versi terbaru${verSuffix}.`, {
             icon: <CheckCircle2 className="h-4 w-4 text-emerald-500" />,
           });
         }
@@ -90,7 +126,7 @@ export function UpdateProvider({ children }: { children: ReactNode }) {
       if (isNotFoundOrNoRelease) {
         setUpdateInfo(null);
         if (!silent) {
-          toast.success("Aplikasi sudah menggunakan versi terbaru (v1.0.0).", {
+          toast.success(`Aplikasi sudah menggunakan versi terbaru${verSuffix}.`, {
             description: "Belum ada rilis baru yang dipublikasikan di GitHub.",
             icon: <CheckCircle2 className="h-4 w-4 text-emerald-500" />,
           });
@@ -161,6 +197,7 @@ export function UpdateProvider({ children }: { children: ReactNode }) {
   return (
     <UpdateContext.Provider
       value={{
+        currentVersion,
         updateInfo,
         isChecking,
         isDownloading,
@@ -256,18 +293,20 @@ export async function triggerManualUpdateCheck() {
     toast.info("Pembaruan otomatis hanya tersedia pada versi desktop.");
     return;
   }
+  const ver = cachedAppVersion || (await getAppVersion());
+  const verSuffix = ver ? ` (${ver})` : "";
   try {
     const { check } = await import("@tauri-apps/plugin-updater");
     const update = await check();
     if (update?.available) {
       toast.info(`Versi baru v${update.version} tersedia!`);
     } else {
-      toast.success("Aplikasi sudah menggunakan versi terbaru (v1.0.0).");
+      toast.success(`Aplikasi sudah menggunakan versi terbaru${verSuffix}.`);
     }
   } catch (err: any) {
     const errMsg = String(err?.message || err || "");
     if (errMsg.includes("404") || errMsg.includes("release JSON")) {
-      toast.success("Aplikasi sudah menggunakan versi terbaru (v1.0.0).", {
+      toast.success(`Aplikasi sudah menggunakan versi terbaru${verSuffix}.`, {
         description: "Belum ada rilis baru di GitHub.",
       });
     } else {
