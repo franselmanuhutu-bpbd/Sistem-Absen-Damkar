@@ -2,7 +2,7 @@ import { serve } from "bun";
 import index from "./index.html";
 
 const PORT = Number(process.env.PORT) || 3000;
-const BACKEND_URL = process.env.BACKEND_URL || "http://localhost:8000";
+const BACKEND_URL = process.env.BACKEND_URL || "https://sistem-absen-damkar.vercel.app";
 
 const server = serve({
   port: PORT,

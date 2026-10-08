@@ -128,6 +128,9 @@ ALLOWED_ORIGINS = [
     "http://127.0.0.1:5173",
     "http://localhost:8000",
     "http://127.0.0.1:8000",
+    "tauri://localhost",
+    "https://tauri.localhost",
+    "http://tauri.localhost",
 ]
 
 # Allow additional origins from environment variable if set
@@ -138,7 +141,7 @@ if custom_origins:
 app.add_middleware(
     CORSMiddleware,
     allow_origins=ALLOWED_ORIGINS,
-    allow_origin_regex=r"^https:\/\/sistem-absen-damkar.*\.vercel\.app$",
+    allow_origin_regex=r"^(https:\/\/sistem-absen-damkar.*\.vercel\.app|(https?|tauri):\/\/(localhost|tauri\.localhost)(:\d+)?)$",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

@@ -4,6 +4,11 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import "@/index.css";
 import App from "@/App";
 
+// Polyfill process in browser environment to prevent ReferenceError: process is not defined
+if (typeof window !== "undefined") {
+  (window as any).process = (window as any).process || { env: {} };
+}
+
 // Tangani unhandled rejection jaringan secara global agar dev popup Bun tidak memblokir layar pengguna
 if (typeof window !== "undefined") {
   window.addEventListener("unhandledrejection", (event) => {

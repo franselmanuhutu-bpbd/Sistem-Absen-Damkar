@@ -1,7 +1,134 @@
-import axios, { type AxiosInstance, type InternalAxiosRequestConfig } from "axios";
+import axios, { type AxiosInstance, type InternalAxiosRequestConfig, type AxiosResponse } from "axios";
 
-export const API_BASE = "/api";
+export const DEFAULT_VERCEL_API_URL = "https://sistem-absen-damkar.vercel.app/api";
+
+export function isTauriEnvironment(): boolean {
+  if (typeof window === "undefined") return false;
+  return Boolean(
+    (window as any).__TAURI_INTERNALS__ ||
+    (window as any).__TAURI__ ||
+    window.location.protocol === "tauri:" ||
+    window.location.protocol === "asset:" ||
+    window.location.hostname === "tauri.localhost"
+  );
+}
+
+export function getApiBase(): string {
+  // 1. Explicit override saved in localStorage (useful for switching targets)
+  if (typeof window !== "undefined") {
+    const override = localStorage.getItem("damkar_api_url");
+    if (override && override.trim()) return override.trim();
+  }
+
+  // 2. Build-time or runtime environment variable (browser-safe check)
+  let envUrl: string | undefined;
+  try {
+    if (typeof process !== "undefined" && process?.env?.API_BASE_URL) {
+      envUrl = process.env.API_BASE_URL;
+    }
+  } catch {
+    // Process is not defined in standard browser context
+  }
+  if (envUrl && envUrl.trim()) {
+    return envUrl.trim();
+  }
+
+  // 3. Desktop Tauri App (dev & release)
+  // Inside Tauri desktop webview, relative "/api" fails because there is no local backend server.
+  // Automatically points to the Vercel API.
+  if (isTauriEnvironment()) {
+    return DEFAULT_VERCEL_API_URL;
+  }
+
+  // 4. Standard Web Browser (Vercel web deployment or dev proxy)
+  return "/api";
+}
+
+export const API_BASE = getApiBase();
 export const TOKEN_KEY = "damkar_token";
+
+async function tauriAxiosAdapter(config: InternalAxiosRequestConfig): Promise<AxiosResponse> {
+  const { fetch: tauriFetch } = await import("@tauri-apps/plugin-http");
+
+  let fullUrl: string;
+  try {
+    fullUrl = axios.getUri(config);
+  } catch {
+    const base = config.baseURL || getApiBase();
+    const path = config.url || "";
+    fullUrl = path.startsWith("http") ? path : `${base.replace(/\/$/, "")}/${path.replace(/^\//, "")}`;
+  }
+
+  // Format headers
+  const headers: Record<string, string> = {};
+  if (config.headers) {
+    for (const [key, val] of Object.entries(config.headers)) {
+      if (val !== undefined && val !== null && typeof val !== "function") {
+        headers[key] = String(val);
+      }
+    }
+  }
+
+  // Format body
+  let body: any = undefined;
+  if (config.data !== undefined && config.data !== null) {
+    if (typeof config.data === "string" || config.data instanceof FormData || config.data instanceof Blob) {
+      body = config.data;
+    } else {
+      body = JSON.stringify(config.data);
+      if (!headers["Content-Type"] && !headers["content-type"]) {
+        headers["Content-Type"] = "application/json";
+      }
+    }
+  }
+
+  const response = await tauriFetch(fullUrl, {
+    method: (config.method || "GET").toUpperCase(),
+    headers,
+    body,
+  });
+
+  const responseType = config.responseType || "json";
+  let data: any;
+  if (responseType === "blob") {
+    data = await response.blob();
+  } else if (responseType === "arraybuffer") {
+    data = await response.arrayBuffer();
+  } else if (responseType === "text") {
+    data = await response.text();
+  } else {
+    const text = await response.text();
+    try {
+      data = JSON.parse(text);
+    } catch {
+      data = text;
+    }
+  }
+
+  const resHeaders: Record<string, string> = {};
+  response.headers.forEach((val, key) => {
+    resHeaders[key] = val;
+  });
+
+  const axiosResponse: AxiosResponse = {
+    data,
+    status: response.status,
+    statusText: response.statusText,
+    headers: resHeaders as any,
+    config,
+    request: {},
+  };
+
+  if (response.status >= 200 && response.status < 300) {
+    return axiosResponse;
+  }
+
+  const error: any = new Error(`Request failed with status code ${response.status}`);
+  error.response = axiosResponse;
+  error.config = config;
+  error.isAxiosError = true;
+  throw error;
+}
 
 const api: AxiosInstance = axios.create({
   baseURL: API_BASE,
@@ -9,10 +136,19 @@ const api: AxiosInstance = axios.create({
   headers: {
     "Content-Type": "application/json",
   },
+  adapter: isTauriEnvironment() ? tauriAxiosAdapter : undefined,
 });
 
 api.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {
+    // Force native Tauri adapter inside desktop app to bypass any CORS restrictions
+    if (isTauriEnvironment()) {
+      config.adapter = tauriAxiosAdapter;
+      if (!config.baseURL || config.baseURL === "/api") {
+        config.baseURL = getApiBase();
+      }
+    }
+
     const token = localStorage.getItem(TOKEN_KEY);
 
     if (token && config.headers) {
