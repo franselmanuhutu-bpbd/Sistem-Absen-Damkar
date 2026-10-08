@@ -53,6 +53,9 @@ export default function ManajemenRegu() {
   const [rollSearch, setRollSearch] = useState("");
   const [rollFilterTab, setRollFilterTab] = useState<"all" | "unassigned" | "other">("unassigned");
   const [submittingRoll, setSubmittingRoll] = useState(false);
+  const [submittingRename, setSubmittingRename] = useState(false);
+  const [submittingCmd, setSubmittingCmd] = useState(false);
+  const [submittingKasubid, setSubmittingKasubid] = useState(false);
   const [rename, setRename] = useState<any>(null);
   const [cmd, setCmd] = useState<any>(null);
   const [ksForm, setKsForm] = useState<any>(null);
@@ -200,26 +203,61 @@ export default function ManajemenRegu() {
     });
   };
   const submitRename = async () => {
+    if (!rename?.name?.trim()) return;
+    setSubmittingRename(true);
     try {
-      await api.put(`/teams/${rename.id}/rename`, { name: rename.name });
+      await api.put(`/teams/${rename.id}/rename`, { name: rename.name.trim() });
       toast.success("Nama regu diperbarui");
-      setRename(null); loadTeams(); loadDetail(activeTeam, selectedDate);
-    } catch (e) { toast.error(apiError(e)); }
+      setRename(null);
+      loadTeams();
+      loadDetail(activeTeam, selectedDate);
+    } catch (e) {
+      toast.error(apiError(e));
+    } finally {
+      setSubmittingRename(false);
+    }
   };
+
   const submitCmd = async () => {
+    if (!cmd?.employee_id) return;
+    setSubmittingCmd(true);
     try {
       await api.post("/commanders", { team_id: activeTeam, employee_id: cmd.employee_id, start_date: cmd.start_date });
       toast.success("Komandan Regu ditetapkan");
-      setCmd(null); loadDetail(activeTeam, selectedDate);
-    } catch (e) { toast.error(apiError(e)); }
+      setCmd(null);
+      loadDetail(activeTeam, selectedDate);
+    } catch (e) {
+      toast.error(apiError(e));
+    } finally {
+      setSubmittingCmd(false);
+    }
   };
+
   const submitKasubid = async () => {
+    if (!ksForm?.employee_id) return;
+    setSubmittingKasubid(true);
     try {
       await api.post("/kasubid", { position_id: ksForm.position_id, employee_id: ksForm.employee_id, start_date: ksForm.start_date });
       toast.success("Kasubid ditetapkan");
-      setKsForm(null); loadKasubid(selectedDate);
-    } catch (e) { toast.error(apiError(e)); }
+      setKsForm(null);
+      loadKasubid(selectedDate);
+    } catch (e) {
+      toast.error(apiError(e));
+    } finally {
+      setSubmittingKasubid(false);
+    }
   };
+
+  // Pegawai yang sudah terpilih di Kasubid 1 tidak boleh muncul di pilihan Kasubid 2 (dan sebaliknya)
+  const availableKasubidEmployees = useMemo(() => {
+    if (!ksForm) return allEmp;
+    const otherKasubidEmployeeIds = new Set(
+      kasubid
+        .filter((k: any) => k.position_id !== ksForm.position_id && k.employee_id)
+        .map((k: any) => k.employee_id)
+    );
+    return allEmp.filter((e: any) => !otherKasubidEmployeeIds.has(e.id));
+  }, [allEmp, kasubid, ksForm]);
   const openHist = () => {
     setHist(true);
     api.get(`/teams/${activeTeam}/history`).then((r) => setHistData(r.data)).catch((e) => toast.error(apiError(e)));
@@ -295,12 +333,12 @@ export default function ManajemenRegu() {
 
   return (
     <div className="space-y-5">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-around">
         <div>
           <h2 className="font-heading text-2xl font-bold text-slate-900">Struktur Organisasi &amp; Rolling</h2>
           <p className="text-sm text-slate-500">Kelola Kasubid, 6 regu, Komandan Regu, dan rolling pegawai berbasis periode.</p>
         </div>
-        <div className="flex flex-wrap items-center gap-2.5">
+        <div className="flex flex-col gap-3 sm:flex-row sm:justify-between">
           <div className="flex items-center gap-2">
             <span className="text-xs font-semibold text-slate-600">Tanggal Acuan</span>
             <Input
@@ -317,7 +355,7 @@ export default function ManajemenRegu() {
               size="sm"
               onClick={openResetDialog}
               data-testid="reset-assignments-btn"
-              className="h-9 gap-2 border-rose-200 text-rose-600 hover:bg-rose-50 text-xs"
+              className="h-9 w-52 gap-2 border-rose-200 text-rose-600 hover:bg-rose-50 text-xs"
             >
               <RotateCcw className="h-3.5 w-3.5" /> Reset Penempatan Regu
             </Button>
@@ -1061,8 +1099,11 @@ export default function ManajemenRegu() {
           </DialogHeader>
           {rename && <Input value={rename.name} onChange={(e) => setRename({ ...rename, name: e.target.value })} data-testid="rename-input" />}
           <DialogFooter>
-            <Button variant="outline" onClick={() => setRename(null)}>Batal</Button>
-            <Button onClick={submitRename} className="bg-red-600 hover:bg-red-700" data-testid="rename-save-btn">Simpan</Button>
+            <Button variant="outline" onClick={() => setRename(null)} disabled={submittingRename}>Batal</Button>
+            <Button onClick={submitRename} disabled={!rename?.name?.trim() || submittingRename} className="bg-red-600 hover:bg-red-700" data-testid="rename-save-btn">
+              {submittingRename && <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />}
+              Simpan
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -1096,8 +1137,11 @@ export default function ManajemenRegu() {
             </div>
           )}
           <DialogFooter>
-            <Button variant="outline" onClick={() => setCmd(null)}>Batal</Button>
-            <Button onClick={submitCmd} disabled={!cmd?.employee_id} className="bg-red-600 hover:bg-red-700" data-testid="cmd-save-btn">Simpan</Button>
+            <Button variant="outline" onClick={() => setCmd(null)} disabled={submittingCmd}>Batal</Button>
+            <Button onClick={submitCmd} disabled={!cmd?.employee_id || submittingCmd} className="bg-red-600 hover:bg-red-700" data-testid="cmd-save-btn">
+              {submittingCmd && <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />}
+              Simpan
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -1118,7 +1162,7 @@ export default function ManajemenRegu() {
                 <EmployeeSearchSelect
                   value={ksForm.employee_id}
                   onChange={(v) => setKsForm({ ...ksForm, employee_id: v })}
-                  employees={allEmp}
+                  employees={availableKasubidEmployees}
                   placeholder="Cari & pilih pejabat (nama atau NIP)..."
                   data-testid="ks-employee"
                 />
@@ -1131,8 +1175,11 @@ export default function ManajemenRegu() {
             </div>
           )}
           <DialogFooter>
-            <Button variant="outline" onClick={() => setKsForm(null)}>Batal</Button>
-            <Button onClick={submitKasubid} disabled={!ksForm?.employee_id} className="bg-red-600 hover:bg-red-700" data-testid="ks-save-btn">Simpan</Button>
+            <Button variant="outline" onClick={() => setKsForm(null)} disabled={submittingKasubid}>Batal</Button>
+            <Button onClick={submitKasubid} disabled={!ksForm?.employee_id || submittingKasubid} className="bg-red-600 hover:bg-red-700" data-testid="ks-save-btn">
+              {submittingKasubid && <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />}
+              Simpan
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

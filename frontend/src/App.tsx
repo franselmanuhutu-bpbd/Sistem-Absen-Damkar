@@ -20,6 +20,8 @@ import LaporanExport from "@/pages/LaporanExport";
 import UserManagement from "@/pages/UserManagement";
 import AuditLog from "@/pages/AuditLog";
 
+import { NavigationGuardProvider } from "@/context/NavigationGuardContext";
+
 interface ProtectedProps {
   children: ReactNode;
   roles?: string[];
@@ -42,7 +44,8 @@ export function App() {
   return (
     <AuthProvider>
       <BrowserRouter>
-        <Routes>
+        <NavigationGuardProvider>
+          <Routes>
           <Route path="/login" element={<Login />} />
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
           <Route path="/dashboard" element={<Protected><Dashboard /></Protected>} />
@@ -61,6 +64,7 @@ export function App() {
           <Route path="/audit-log" element={<Protected roles={["admin"]}><AuditLog /></Protected>} />
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Routes>
+        </NavigationGuardProvider>
       </BrowserRouter>
       <Toaster position="top-right" richColors />
     </AuthProvider>

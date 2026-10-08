@@ -1,6 +1,7 @@
 import { useState, useEffect, type ReactNode } from "react";
-import { NavLink, useLocation } from "react-router-dom";
+import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
+import { useNavigationGuard } from "@/context/NavigationGuardContext";
 import { ROLE_LABEL } from "@/lib/constants";
 import {
   LayoutDashboard,
@@ -63,6 +64,8 @@ const NAV: NavItem[] = [
 
 export function Layout({ children }: { children: ReactNode }) {
   const { user, logout } = useAuth();
+  const { confirmAction } = useNavigationGuard();
+  const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const [collapsed, setCollapsed] = useState<boolean>(() => {
     if (typeof window !== "undefined") {
@@ -80,6 +83,21 @@ export function Layout({ children }: { children: ReactNode }) {
   );
 
   const userName = user && typeof user === "object" && user.name ? user.name : "User";
+
+  const handleNavClick = (e: React.MouseEvent, path: string) => {
+    if (loc.pathname === path) return;
+    e.preventDefault();
+    confirmAction(() => {
+      navigate(path);
+      setOpen(false);
+    });
+  };
+
+  const handleLogout = () => {
+    confirmAction(() => {
+      logout();
+    });
+  };
 
   useEffect(() => {
     try {
@@ -173,6 +191,7 @@ export function Layout({ children }: { children: ReactNode }) {
               >
                 <NavLink
                   to={n.path}
+                  onClick={(e) => handleNavClick(e, n.path)}
                   data-testid={`nav-${n.path.slice(1)}`}
                   title={collapsed ? n.label : undefined}
                   className={({ isActive }) =>
@@ -223,7 +242,7 @@ export function Layout({ children }: { children: ReactNode }) {
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
                 data-testid="logout-btn-collapsed"
-                onClick={logout}
+                onClick={handleLogout}
                 className="flex h-9 w-9 items-center justify-center rounded-lg text-slate-400 hover:bg-white/10 hover:text-rose-400 transition-colors"
                 title="Keluar"
               >
@@ -255,7 +274,7 @@ export function Layout({ children }: { children: ReactNode }) {
               >
                 <Button
                   data-testid="logout-btn"
-                  onClick={logout}
+                  onClick={handleLogout}
                   variant="ghost"
                   size="sm"
                   className="flex-1 justify-start gap-2 text-slate-300 hover:bg-white/5 hover:text-white h-8 px-2 text-xs"
@@ -338,7 +357,7 @@ export function Layout({ children }: { children: ReactNode }) {
                     >
                       <NavLink
                         to={n.path}
-                        onClick={() => setOpen(false)}
+                        onClick={(e) => handleNavClick(e, n.path)}
                         data-testid={`nav-mobile-${n.path.slice(1)}`}
                         className={({ isActive }) =>
                           `group relative flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors duration-150 ${
@@ -369,7 +388,7 @@ export function Layout({ children }: { children: ReactNode }) {
                 </div>
                 <Button
                   data-testid="logout-btn-mobile"
-                  onClick={logout}
+                  onClick={handleLogout}
                   variant="ghost"
                   className="w-full justify-start gap-2 text-slate-300 hover:bg-white/5 hover:text-white"
                 >

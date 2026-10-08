@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import api, { apiError } from "@/lib/api";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Star, UserPlus, UserMinus, History, Search, X } from "lucide-react";
+import { Star, UserPlus, UserMinus, History, Search, X, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { EmployeeSearchSelect } from "@/components/EmployeeSearchSelect";
 import { motion } from "framer-motion";
@@ -22,6 +22,8 @@ export default function PengaturanKasubid() {
   const [setForm, setSetForm] = useState<any>(null);
   const [vacForm, setVacForm] = useState<any>(null);
   const [histPos, setHistPos] = useState<any>(null);
+  const [submittingSet, setSubmittingSet] = useState(false);
+  const [submittingVacate, setSubmittingVacate] = useState(false);
 
   const load = async () => {
     setLoading(true);
@@ -42,19 +44,42 @@ export default function PengaturanKasubid() {
       .catch(() => {});
   }, []);
 
+  // Pegawai yang sudah terpilih di Kasubid 1 tidak boleh muncul di pilihan Kasubid 2 (dan sebaliknya)
+  const availableEmployees = useMemo(() => {
+    if (!setForm) return employees;
+    const otherKasubidEmployeeIds = new Set(
+      positions
+        .filter((p: any) => p.position_id !== setForm.position_id && p.employee_id)
+        .map((p: any) => p.employee_id)
+    );
+    return employees.filter((e: any) => !otherKasubidEmployeeIds.has(e.id));
+  }, [employees, positions, setForm]);
+
   const submitSet = async () => {
+    if (!setForm?.employee_id) return;
+    setSubmittingSet(true);
     try {
       await api.post("/kasubid", { position_id: setForm.position_id, employee_id: setForm.employee_id, start_date: setForm.start_date });
       toast.success("Pejabat Kasubid ditetapkan");
       setSetForm(null); load();
-    } catch (e) { toast.error(apiError(e)); }
+    } catch (e) {
+      toast.error(apiError(e));
+    } finally {
+      setSubmittingSet(false);
+    }
   };
+
   const submitVacate = async () => {
+    setSubmittingVacate(true);
     try {
       await api.post("/kasubid/vacate", { position_id: vacForm.position_id, employee_id: "", start_date: vacForm.start_date });
       toast.success("Posisi Kasubid dikosongkan");
       setVacForm(null); load();
-    } catch (e) { toast.error(apiError(e)); }
+    } catch (e) {
+      toast.error(apiError(e));
+    } finally {
+      setSubmittingVacate(false);
+    }
   };
 
   const statusColor = (s: string) => s === "Aktif" ? "bg-emerald-100 text-emerald-700" : "bg-slate-200 text-slate-600";
@@ -181,7 +206,7 @@ export default function PengaturanKasubid() {
                 <EmployeeSearchSelect
                   value={setForm.employee_id}
                   onChange={(v) => setSetForm({ ...setForm, employee_id: v })}
-                  employees={employees}
+                  employees={availableEmployees}
                   placeholder="Cari & pilih pejabat (nama atau NIP)..."
                   data-testid="pk-employee"
                 />
@@ -194,8 +219,11 @@ export default function PengaturanKasubid() {
             </div>
           )}
           <DialogFooter>
-            <Button variant="outline" onClick={() => setSetForm(null)}>Batal</Button>
-            <Button onClick={submitSet} disabled={!setForm?.employee_id} className="bg-red-600 hover:bg-red-700" data-testid="pk-set-save">Simpan</Button>
+            <Button variant="outline" onClick={() => setSetForm(null)} disabled={submittingSet}>Batal</Button>
+            <Button onClick={submitSet} disabled={!setForm?.employee_id || submittingSet} className="bg-red-600 hover:bg-red-700" data-testid="pk-set-save">
+              {submittingSet && <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />}
+              Simpan
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -219,8 +247,11 @@ export default function PengaturanKasubid() {
             </div>
           )}
           <DialogFooter>
-            <Button variant="outline" onClick={() => setVacForm(null)}>Batal</Button>
-            <Button onClick={submitVacate} className="bg-rose-600 hover:bg-rose-700" data-testid="pk-vacate-save">Kosongkan Posisi</Button>
+            <Button variant="outline" onClick={() => setVacForm(null)} disabled={submittingVacate}>Batal</Button>
+            <Button onClick={submitVacate} disabled={submittingVacate} className="bg-rose-600 hover:bg-rose-700" data-testid="pk-vacate-save">
+              {submittingVacate && <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />}
+              Kosongkan Posisi
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

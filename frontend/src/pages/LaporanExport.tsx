@@ -89,7 +89,7 @@ export default function LaporanExport() {
   };
 
   useEffect(() => {
-    api.get("/teams").then((r) => setTeams(r.data)).catch(() => {});
+    api.get("/teams").then((r) => setTeams(r.data)).catch(() => { });
     if (isAdmin) {
       loadBackupStatus();
       checkPushSubscription();
@@ -360,7 +360,7 @@ export default function LaporanExport() {
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
         <Card className="border-slate-200 p-5 lg:col-span-2 space-y-4">
           <h3 className="font-heading font-bold text-slate-800">Filter Laporan</h3>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div className="space-y-1.5 flex flex-col">
               <Label>Bulan Mulai</Label>
               <MonthPicker
