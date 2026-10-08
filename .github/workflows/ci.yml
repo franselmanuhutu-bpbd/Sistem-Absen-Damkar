@@ -132,6 +132,6 @@ jobs:
           draft: false
           prerelease: false
           files: |
-            frontend/src-tauri/target/release/bundle/nsis/*${{ steps.version_check.outputs.version }}*.exe
-            frontend/src-tauri/target/release/bundle/nsis/*${{ steps.version_check.outputs.version }}*.sig
+            frontend/src-tauri/target/release/bundle/nsis/Damkar.Absensi_${{ steps.version_check.outputs.version }}_x64-setup.exe
+            frontend/src-tauri/target/release/bundle/nsis/Damkar.Absensi_${{ steps.version_check.outputs.version }}_x64-setup.exe.sig
             frontend/src-tauri/target/release/bundle/nsis/latest.json
