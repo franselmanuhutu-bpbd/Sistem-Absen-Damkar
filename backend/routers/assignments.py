@@ -6,7 +6,7 @@ import uuid
 from database import get_db
 from models import AssignmentIn, BatchAssignmentIn, ResetAssignmentsIn
 from auth import get_current_user, require_roles, clean
-from utils import now_iso, write_audit, get_active_kasubid_ids
+from utils import now_iso, write_audit, get_kasubid_ids_for_period
 
 router = APIRouter(tags=["Assignments"])
 
@@ -19,6 +19,55 @@ def _prev_day(date_str: str) -> str:
 def _next_day(date_str: str) -> str:
     """Mengembalikan 1 hari setelah tanggal yang diberikan (format YYYY-MM-DD)."""
     return (_date.fromisoformat(date_str) + timedelta(days=1)).isoformat()
+
+
+async def _remove_kasubid_overlap(
+    db: Any,
+    employee_id: str,
+    start_date: str,
+    end_date: Optional[str],
+) -> None:
+    """Remove only the Kasubid assignment days that overlap a forced rolling period."""
+    period_end = end_date or "9999-12-31"
+    result = (
+        await db.table("sub_unit_assignments")
+        .select("*")
+        .eq("employee_id", employee_id)
+        .lte("start_date", period_end)
+        .execute()
+    )
+    for assignment in result.data or []:
+        assignment_start = assignment["start_date"]
+        assignment_end = assignment.get("end_date") or "9999-12-31"
+        if assignment_end < start_date:
+            continue
+
+        if start_date <= assignment_start and period_end >= assignment_end:
+            await db.table("sub_unit_assignments").delete().eq("id", assignment["id"]).execute()
+        elif assignment_start < start_date and assignment_end > period_end:
+            await db.table("sub_unit_assignments").update({
+                "end_date": _prev_day(start_date),
+                "updated_at": now_iso(),
+            }).eq("id", assignment["id"]).execute()
+            await db.table("sub_unit_assignments").insert({
+                "id": str(uuid.uuid4()),
+                "position_id": assignment["position_id"],
+                "employee_id": employee_id,
+                "start_date": _next_day(period_end),
+                "end_date": assignment.get("end_date"),
+                "created_at": now_iso(),
+                "updated_at": now_iso(),
+            }).execute()
+        elif assignment_start < start_date:
+            await db.table("sub_unit_assignments").update({
+                "end_date": _prev_day(start_date),
+                "updated_at": now_iso(),
+            }).eq("id", assignment["id"]).execute()
+        else:
+            await db.table("sub_unit_assignments").update({
+                "start_date": _next_day(period_end),
+                "updated_at": now_iso(),
+            }).eq("id", assignment["id"]).execute()
 
 
 async def apply_interval_assignment(
@@ -211,10 +260,12 @@ async def create_assignment(body: AssignmentIn, user: dict = Depends(require_rol
     if not emp or not team:
         raise HTTPException(status_code=404, detail="Pegawai / Regu tidak ditemukan")
 
-    # Kasubid tidak boleh ditempatkan ke regu
-    kasubids = await get_active_kasubid_ids(body.start_date)
+    # Kasubid membutuhkan explicit override sebelum dipindahkan ke regu.
+    kasubids = await get_kasubid_ids_for_period(body.start_date, body.end_date)
+    if body.employee_id in kasubids and not getattr(body, "force_kasubid", False):
+        raise HTTPException(status_code=409, detail=f"Pegawai {emp['nama']} adalah Kasubid pada periode tersebut.")
     if body.employee_id in kasubids:
-        raise HTTPException(status_code=400, detail=f"Pegawai {emp['nama']} adalah Kasubid dan tidak dapat ditempatkan ke regu.")
+        await _remove_kasubid_overlap(db, body.employee_id, body.start_date, body.end_date)
 
     # Terapkan algoritma penataan interval temporal
     doc = await apply_interval_assignment(
@@ -254,12 +305,15 @@ async def create_batch_assignment(body: BatchAssignmentIn, user: dict = Depends(
     emp_res = await db.table("employees").select("id, nama").in_("id", body.employee_ids).execute()
     emps = {e["id"]: e["nama"] for e in (emp_res.data or [])}
 
-    # Kasubid tidak boleh ditempatkan ke regu
-    kasubids = await get_active_kasubid_ids(body.start_date)
+    # Kasubid membutuhkan explicit override sebelum dipindahkan ke regu.
+    kasubids = await get_kasubid_ids_for_period(body.start_date, body.end_date)
     kasubid_in_list = [eid for eid in body.employee_ids if eid in kasubids]
-    if kasubid_in_list:
+    if kasubid_in_list and not body.force_kasubid:
         k_names = [emps.get(eid, eid) for eid in kasubid_in_list]
-        raise HTTPException(status_code=400, detail=f"Pegawai ({', '.join(k_names)}) adalah Kasubid dan tidak dapat ditempatkan ke regu.")
+        raise HTTPException(status_code=409, detail=f"Pegawai ({', '.join(k_names)}) adalah Kasubid pada periode tersebut.")
+    if body.force_kasubid:
+        for eid in kasubid_in_list:
+            await _remove_kasubid_overlap(db, eid, body.start_date, body.end_date)
 
     # Terapkan pemotongan interval dan simpan penempatan untuk setiap pegawai yang dipilih
     success_count = 0

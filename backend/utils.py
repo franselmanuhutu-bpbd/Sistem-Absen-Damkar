@@ -124,14 +124,29 @@ async def resolve_kasubid_for_date(position_id: str, date: str) -> Optional[str]
 
 
 async def get_active_kasubid_ids(date: str) -> set:
-    """Return set of employee IDs that are active Kasubid on a given date or structural Kasubid."""
+    """Return employee IDs with a Kasubid assignment active on the given date."""
     db = await get_db()
     k1 = await resolve_kasubid_for_date("KASUBID1", date)
     k2 = await resolve_kasubid_for_date("KASUBID2", date)
-    ids = {eid for eid in (k1, k2) if eid}
-    res = await db.table("employees").select("id, jabatan").ilike("jabatan", "%kepala sub bidang%").execute()
-    for row in (res.data or []):
-        ids.add(row["id"])
+    return {eid for eid in (k1, k2) if eid}
+
+
+async def get_kasubid_ids_for_period(start_date: str, end_date: Optional[str] = None) -> set:
+    """Return assigned Kasubid employees on any day in [start_date, end_date]."""
+    db = await get_db()
+    period_end = end_date or "9999-12-31"
+    assignments = (
+        await db.table("sub_unit_assignments")
+        .select("employee_id, start_date, end_date")
+        .lte("start_date", period_end)
+        .execute()
+    ).data or []
+    ids = {
+        assignment["employee_id"]
+        for assignment in assignments
+        if (assignment.get("end_date") or "9999-12-31") >= start_date
+    }
+
     return ids
 
 

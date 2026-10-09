@@ -52,6 +52,7 @@ class BatchAssignmentIn(BaseModel):
     team_id: str
     start_date: str
     end_date: Optional[str] = None
+    force_kasubid: bool = False
 
 
 class ResetAssignmentsIn(BaseModel):

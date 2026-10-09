@@ -54,6 +54,10 @@ export default function ManajemenRegu() {
   const [rollSearch, setRollSearch] = useState("");
   const [rollFilterTab, setRollFilterTab] = useState<"all" | "unassigned" | "other">("unassigned");
   const [submittingRoll, setSubmittingRoll] = useState(false);
+  const [kasubidOverrideModal, setKasubidOverrideModal] = useState<{
+    open: boolean;
+    employees: any[];
+  }>({ open: false, employees: [] });
   const [submittingRename, setSubmittingRename] = useState(false);
   const [submittingCmd, setSubmittingCmd] = useState(false);
   const [submittingKasubid, setSubmittingKasubid] = useState(false);
@@ -107,6 +111,7 @@ export default function ManajemenRegu() {
     confirmedIds: Set<string>;
     targetTeamName: string;
     newPeriodLabel: string;
+    forceKasubid: boolean;
     submitting: boolean;
   }>({
     open: false,
@@ -114,6 +119,7 @@ export default function ManajemenRegu() {
     confirmedIds: new Set(),
     targetTeamName: "",
     newPeriodLabel: "",
+    forceKasubid: false,
     submitting: false,
   });
 
@@ -133,7 +139,7 @@ export default function ManajemenRegu() {
   useEffect(() => { if (activeTeam) loadDetail(activeTeam, selectedDate); }, [activeTeam, selectedDate]);
 
   // Eksekusi penempatan batch ke backend setelah konfirmasi
-  const executeBatchRoll = async (employeeIdsToAssign: string[]) => {
+  const executeBatchRoll = async (employeeIdsToAssign: string[], forceKasubid = false) => {
     if (!roll || !employeeIdsToAssign.length) {
       toast.warning("Tidak ada pegawai yang dipilih untuk ditempatkan.");
       return;
@@ -150,6 +156,7 @@ export default function ManajemenRegu() {
         team_id: roll.team_id,
         start_date: roll.start_date,
         end_date: finalEndDate,
+        force_kasubid: forceKasubid,
       });
       const count = res.data?.count ?? employeeIdsToAssign.length;
       const modeLabel = roll.mode === "tunggal"
@@ -157,10 +164,11 @@ export default function ManajemenRegu() {
         : (roll.mode === "rentang" ? `Rentang ${formatDateId(roll.start_date)} s/d ${formatDateId(finalEndDate!)}` : "Seterusnya");
 
       toast.success(`${count} penempatan regu berhasil disimpan [${modeLabel}]`);
-      setConflictModal({ open: false, conflicts: [], confirmedIds: new Set(), targetTeamName: "", newPeriodLabel: "", submitting: false });
+      setConflictModal({ open: false, conflicts: [], confirmedIds: new Set(), targetTeamName: "", newPeriodLabel: "", forceKasubid: false, submitting: false });
       setRoll(null);
       loadDetail(activeTeam, selectedDate);
       loadEmp(selectedDate);
+      loadKasubid(selectedDate);
     } catch (e) {
       toast.error(apiError(e));
     } finally {
@@ -170,7 +178,7 @@ export default function ManajemenRegu() {
   };
 
   // Simpan penempatan anggota massal: Cek konflik & konfirmasi penimpaan terlebih dahulu
-  const submitRoll = async () => {
+  const submitRoll = async (forceKasubid = false) => {
     if (!roll?.employee_ids?.length || !roll?.team_id) {
       toast.error("Pilih setidaknya satu pegawai dan tentukan regu tujuan.");
       return;
@@ -184,6 +192,15 @@ export default function ManajemenRegu() {
       const finalEndDate = roll.mode === "tunggal"
         ? roll.start_date
         : (roll.mode === "rentang" ? (roll.end_date || null) : null);
+
+        const kasubidConflicts = roll.employee_ids
+          .map((id) => allEmp.find((employee: any) => employee.id === id))
+          .filter((employee: any) => employee && kasubidPeriodEmployeeIds.has(employee.id));
+        if (kasubidConflicts.length > 0 && !forceKasubid) {
+          setKasubidOverrideModal({ open: true, employees: kasubidConflicts });
+          setSubmittingRoll(false);
+          return;
+        }
 
       // Cek apakah ada pegawai yang sudah memiliki penempatan pada interval ini
       const conflictRes = await api.post("/assignments/check-conflicts", {
@@ -207,6 +224,7 @@ export default function ManajemenRegu() {
           confirmedIds: new Set(roll.employee_ids),
           targetTeamName,
           newPeriodLabel,
+          forceKasubid,
           submitting: false,
         });
         setSubmittingRoll(false);
@@ -214,7 +232,7 @@ export default function ManajemenRegu() {
       }
 
       // Jika tidak ada bentrok penempatan, langsung simpan
-      await executeBatchRoll(roll.employee_ids);
+      await executeBatchRoll(roll.employee_ids, forceKasubid);
     } catch (e) {
       toast.error(apiError(e));
       setSubmittingRoll(false);
@@ -227,27 +245,33 @@ export default function ManajemenRegu() {
     return allEmp.filter((e) => selectedSet.has(e.id));
   }, [allEmp, roll?.employee_ids]);
 
-  // Set ID pegawai yang menjabat Kasubid (dikecualikan dari regu dan pencarian rolling)
+  // Kasubid hanya dikecualikan jika masa jabatannya bersinggungan dengan periode rolling.
   const kasubidEmpIds = useMemo(() => {
     const s = new Set<string>();
-    (kasubid || []).forEach((k: any) => {
-      if (k.employee_id) s.add(k.employee_id);
+    const periodStart = roll?.start_date || selectedDate;
+    const periodEnd = roll
+      ? (roll.mode === "tunggal" ? roll.start_date : roll.mode === "rentang" ? roll.end_date : null)
+      : selectedDate;
+    const periodEndCap = periodEnd || "9999-12-31";
+
+    (kasubid || []).forEach((position: any) => {
+      (position.history || []).forEach((assignment: any) => {
+        const assignmentEnd = assignment.end_date || "9999-12-31";
+        if (assignment.start_date <= periodEndCap && assignmentEnd >= periodStart) {
+          s.add(assignment.employee_id);
+        }
+      });
     });
-    (allEmp || []).forEach((e: any) => {
-      if (e.is_kasubid || e.jabatan?.toLowerCase().includes("kepala sub bidang")) {
-        s.add(e.id);
-      }
-    });
+
     return s;
-  }, [kasubid, allEmp]);
+  }, [kasubid, allEmp, roll, selectedDate]);
+
+  const kasubidPeriodEmployeeIds = kasubidEmpIds;
 
   const filteredRollEmployees = useMemo(() => {
     if (!roll) return [];
     const q = rollSearch.trim().toLowerCase();
     return allEmp.filter((emp: any) => {
-      // Kasubid memiliki absensi mandiri, tidak boleh masuk pencarian / penempatan regu
-      if (kasubidEmpIds.has(emp.id)) return false;
-
       if (rollFilterTab === "unassigned" && emp.current_team_id) return false;
       if (rollFilterTab === "other" && (!emp.current_team_id || emp.current_team_id === roll.team_id)) return false;
 
@@ -258,7 +282,7 @@ export default function ManajemenRegu() {
       const matchJabatan = emp.jabatan ? emp.jabatan.toLowerCase().includes(q) : false;
       return matchName || matchNip || matchTeam || matchJabatan;
     });
-  }, [allEmp, roll, rollSearch, rollFilterTab, kasubidEmpIds]);
+  }, [allEmp, roll, rollSearch, rollFilterTab]);
 
   const unassignedEmpCount = useMemo(
     () => allEmp.filter((e) => !kasubidEmpIds.has(e.id) && !e.current_team_id).length,
@@ -500,7 +524,6 @@ export default function ManajemenRegu() {
   const curTeam = teams.find((t) => t.id === activeTeam);
 
   const filteredMembers = (detail?.members || []).filter((e: any) => {
-    if (kasubidEmpIds.has(e.id)) return false;
     const q = memberSearch.trim().toLowerCase();
     if (!q) return true;
     const matchName = e.nama ? e.nama.toLowerCase().includes(q) : false;
@@ -1212,7 +1235,11 @@ export default function ManajemenRegu() {
                           </div>
 
                           <div className="shrink-0 flex items-center gap-2">
-                            {isTargetTeam ? (
+                            {kasubidPeriodEmployeeIds.has(emp.id) ? (
+                              <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-100 text-[12px]">
+                                Kasubid pada periode
+                              </Badge>
+                            ) : isTargetTeam ? (
                               <Badge className="bg-emerald-100 text-emerald-800 hover:bg-emerald-100 text-[12px]">
                                 Sudah di regu ini
                               </Badge>
@@ -1245,7 +1272,7 @@ export default function ManajemenRegu() {
               Batal
             </Button>
             <Button
-              onClick={submitRoll}
+              onClick={() => submitRoll()}
               disabled={submittingRoll || !roll?.team_id || (roll?.employee_ids?.length || 0) === 0}
               className="bg-red-600 hover:bg-red-700 gap-1.5"
               data-testid="roll-save-btn"
@@ -1361,6 +1388,58 @@ export default function ManajemenRegu() {
             <Button onClick={() => submitCmd(false)} disabled={!cmd?.employee_id || submittingCmd} className="bg-red-600 hover:bg-red-700" data-testid="cmd-save-btn">
               {submittingCmd && <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />}
               Simpan
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog konfirmasi penggantian Kasubid saat rolling */}
+      <Dialog
+        open={kasubidOverrideModal.open}
+        onOpenChange={(open) => !submittingRoll && setKasubidOverrideModal((prev) => ({ ...prev, open }))}
+      >
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-amber-700">
+              <AlertTriangle className="h-5 w-5" />
+              Konfirmasi Penggantian Kasubid
+            </DialogTitle>
+            <DialogDescription className="text-xs text-slate-500">
+              Pegawai berikut masih menjabat Kasubid pada sebagian atau seluruh periode rolling yang dipilih.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+            Jika dilanjutkan, masa jabatan Kasubid yang bertumpang tindih akan dihapus dari periode rolling,
+            lalu pegawai akan ditempatkan ke regu tujuan.
+          </div>
+
+          <div className="max-h-48 overflow-y-auto rounded-lg border border-slate-200 divide-y divide-slate-100">
+            {kasubidOverrideModal.employees.map((employee: any) => (
+              <div key={employee.id} className="px-3 py-2.5">
+                <p className="font-semibold text-slate-800">{employee.nama}</p>
+                <p className="text-xs text-slate-500">{employee.nip || "Tanpa NIP"} · Kasubid pada periode terpilih</p>
+              </div>
+            ))}
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              disabled={submittingRoll}
+              onClick={() => setKasubidOverrideModal((prev) => ({ ...prev, open: false }))}
+            >
+              Batal
+            </Button>
+            <Button
+              disabled={submittingRoll}
+              onClick={() => {
+                setKasubidOverrideModal({ open: false, employees: [] });
+                void submitRoll(true);
+              }}
+              className="bg-amber-600 text-white hover:bg-amber-700"
+            >
+              Lanjutkan &amp; Hapus Kasubid
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1653,7 +1732,7 @@ export default function ManajemenRegu() {
             <Button
               type="button"
               disabled={conflictModal.submitting || conflictModal.confirmedIds.size === 0}
-              onClick={() => executeBatchRoll(Array.from(conflictModal.confirmedIds))}
+              onClick={() => executeBatchRoll(Array.from(conflictModal.confirmedIds), conflictModal.forceKasubid)}
               className="bg-amber-600 hover:bg-amber-700 text-white gap-2 font-semibold"
             >
               {conflictModal.submitting ? (
