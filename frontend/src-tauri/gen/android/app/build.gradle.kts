@@ -15,7 +15,7 @@ val tauriProperties = Properties().apply {
 }
 
 android {
-    compileSdk = 35
+    compileSdk = 36
     namespace = "id.mimika.damkar.absensi"
     defaultConfig {
         manifestPlaceholders["usesCleartextTraffic"] = "false"
