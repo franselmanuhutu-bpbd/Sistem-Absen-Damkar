@@ -86,7 +86,7 @@ export function ChangePasswordDialog({ open, onOpenChange }: ChangePasswordDialo
         }
       }}
     >
-      <DialogContent className="max-w-md">
+      <DialogContent className="w-full">
         <DialogHeader>
           <div className="flex items-center gap-2.5">
             <div className="flex h-9 w-9 items-center justify-center rounded-full bg-red-100 text-red-600">
@@ -109,12 +109,12 @@ export function ChangePasswordDialog({ open, onOpenChange }: ChangePasswordDialo
             </div>
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2">
-                <p className="truncate text-sm font-semibold text-slate-900 leading-tight">{user.name}</p>
+                <p className="text-sm font-semibold text-slate-900 leading-tight">{user.name}</p>
                 <Badge variant="outline" className="text-[10px] font-semibold uppercase bg-white border-slate-300 text-slate-700">
                   {ROLE_LABEL[user.role] || user.role}
                 </Badge>
               </div>
-              <p className="truncate text-xs text-slate-500 mt-0.5">{user.email}</p>
+              <p className="text-xs text-slate-500 mt-0.5">{user.email}</p>
             </div>
           </div>
         )}

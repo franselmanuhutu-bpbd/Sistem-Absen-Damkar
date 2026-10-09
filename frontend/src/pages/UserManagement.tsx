@@ -70,14 +70,6 @@ export default function UserManagement() {
           )}
         </div>
         <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            onClick={() => setChangePwdOpen(true)}
-            className="gap-2"
-            data-testid="change-own-password-btn"
-          >
-            <KeyRound className="h-4 w-4" /> Ubah Password Saya
-          </Button>
           <Button onClick={() => setForm({ name: "", email: "", password: "", role: "operator", status: "ACTIVE", employee_id: "" })} className="gap-2 bg-red-600 hover:bg-red-700" data-testid="add-user-btn">
             <UserPlus className="h-4 w-4" /> Tambah User
           </Button>
