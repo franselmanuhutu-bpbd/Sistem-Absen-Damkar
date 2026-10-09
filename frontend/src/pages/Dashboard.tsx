@@ -1,8 +1,7 @@
 import { useEffect, useState, useRef } from "react";
 import { Link } from "react-router-dom";
 import api, { apiError } from "@/lib/api";
-import { STATUSES, STATUS_CONFIG, formatDateId } from "@/lib/constants";
-import { Input } from "@/components/ui/input";
+import { STATUSES, STATUS_CONFIG, formatDateId, monthLabel } from "@/lib/constants";
 import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -53,7 +52,14 @@ interface DashboardResponse {
   total_employees: number;
   totals: Record<string, number>;
   per_team: PerTeamData[];
+  monthly_period?: string;
+  monthly_leaderboard?: MonthlyLeaderboardItem[];
   kasubid: KasubidData[];
+}
+
+interface MonthlyLeaderboardItem {
+  team: TeamData;
+  hadir: number;
 }
 
 function getTodayLocal(): string {
@@ -332,8 +338,9 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* Chart */}
-      <Card className="border-slate-200 p-5">
+      <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-3">
+        {/* Chart */}
+        <Card className="border-slate-200 p-5 lg:col-span-2">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-4">
           <div>
             <h3 className="font-heading text-base font-bold text-slate-800">Grafik Kehadiran per Regu</h3>
@@ -410,7 +417,62 @@ export default function Dashboard() {
             </ResponsiveContainer>
           </div>
         )}
-      </Card>
+        </Card>
+
+        {/* Monthly leaderboard */}
+        <Card className="border-slate-200 p-5">
+          <div className="mb-4 flex items-center justify-between gap-3">
+            <div>
+              <h3 className="font-heading text-base font-bold text-slate-800">Leaderboard Regu Bulan ini</h3>
+              <p className="text-xs text-slate-500">
+                Peringkat regu berdasarkan jumlah Hadir · {monthLabel(data?.monthly_period)}
+              </p>
+            </div>
+            <Flame className="h-5 w-5 shrink-0 text-amber-500" />
+          </div>
+
+          {showSkeleton ? (
+            <div className="space-y-2">
+              {[1, 2, 3].map((rank) => (
+                <Skeleton key={rank} className="h-12 w-full" />
+              ))}
+            </div>
+          ) : (data?.monthly_leaderboard?.length ?? 0) === 0 ? (
+            <p className="rounded-lg border border-dashed border-slate-200 bg-slate-50 p-4 text-center text-sm text-slate-500">
+              Belum ada data leaderboard bulan ini.
+            </p>
+          ) : (
+            <div className="space-y-2">
+              {data?.monthly_leaderboard?.map((item, index) => (
+                <div
+                  key={item.team.id}
+                  data-testid={`monthly-leaderboard-${item.team.code}`}
+                  className="flex items-center gap-3 rounded-lg border border-slate-200 bg-slate-50/60 px-3 py-2.5"
+                >
+                  <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-extrabold ${
+                    index === 0
+                      ? "bg-amber-100 text-amber-700"
+                      : index === 1
+                        ? "bg-slate-200 text-slate-700"
+                        : index === 2
+                          ? "bg-orange-100 text-orange-700"
+                          : "bg-white text-slate-500"
+                  }`}>
+                    {index + 1}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate font-semibold text-slate-800">{item.team.name}</p>
+                    <p className="text-xs text-slate-500">Total kehadiran bulan ini</p>
+                  </div>
+                  <p className="shrink-0 text-lg font-extrabold text-emerald-600">
+                    {item.hadir} <span className="text-xs font-semibold text-slate-500">Hadir</span>
+                  </p>
+                </div>
+              ))}
+            </div>
+          )}
+        </Card>
+      </div>
 
       {/* Per team cards */}
       <div>

@@ -38,6 +38,9 @@ async def _async_test():
             builder.select.return_value.eq.return_value.limit.return_value.execute = AsyncMock(
                 return_value=MagicMock(data=attendance_records)
             )
+            builder.select.return_value.gte.return_value.lt.return_value.limit.return_value.execute = AsyncMock(
+                return_value=MagicMock(data=attendance_records)
+            )
         elif tbl == "teams":
             builder.select.return_value.order.return_value.limit.return_value.execute = AsyncMock(
                 return_value=MagicMock(data=teams)
@@ -66,3 +69,5 @@ async def _async_test():
         assert team_data["HDR"] == 1
         assert team_data["OFF"] == 1
         assert team_data["commander_name"] == "Employee 1"
+        assert res["monthly_period"] == "2026-10"
+        assert res["monthly_leaderboard"][0]["hadir"] == 1

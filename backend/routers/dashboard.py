@@ -1,6 +1,6 @@
 import asyncio
+from datetime import date as _date, datetime, timedelta
 from fastapi import APIRouter, Depends
-from datetime import date as _date
 
 from config import STATUSES, KASUBID_POSITIONS
 from database import get_db
@@ -62,6 +62,17 @@ async def dashboard(date: str = None, user: dict = Depends(get_current_user)):
     total_employees = len(active_emps)
 
     records = (await db.table("attendance").select("*").eq("date", ref).limit(10000).execute()).data or []
+    ref_month = ref[:7]
+    month_start = datetime.strptime(f"{ref_month}-01", "%Y-%m-%d").date()
+    next_month = (month_start.replace(day=28) + timedelta(days=4)).replace(day=1)
+    month_records = (
+        await db.table("attendance")
+        .select("employee_id, team_id, status")
+        .gte("date", month_start.isoformat())
+        .lt("date", next_month.isoformat())
+        .limit(10000)
+        .execute()
+    ).data or []
 
     rec_team_map = {
         r["employee_id"]: r["team_id"]
@@ -98,6 +109,23 @@ async def dashboard(date: str = None, user: dict = Depends(get_current_user)):
         totals[status] += 1
         if team_id in per_team:
             per_team[team_id][status] += 1
+
+    monthly_hadir = {t["id"]: 0 for t in teams}
+    for record in month_records:
+        if (
+            record.get("employee_id") in active_ids
+            and str(record.get("status") or "").strip().upper() == "HDR"
+            and record.get("team_id") in monthly_hadir
+        ):
+            monthly_hadir[record["team_id"]] += 1
+    monthly_leaderboard = [
+        {
+            "team": t,
+            "hadir": monthly_hadir[t["id"]],
+        }
+        for t in teams
+    ]
+    monthly_leaderboard.sort(key=lambda item: (-item["hadir"], item["team"].get("order", 0)))
 
     # Parallel resolution of kasubid and commanders
     kasubid_keys = [("KASUBID1", "Kasubid 1"), ("KASUBID2", "Kasubid 2")]
@@ -157,6 +185,8 @@ async def dashboard(date: str = None, user: dict = Depends(get_current_user)):
         "total_employees": total_employees,
         "totals": totals,
         "per_team": team_list,
+        "monthly_period": ref_month,
+        "monthly_leaderboard": monthly_leaderboard,
         "kasubid": kasubid,
     }
 
