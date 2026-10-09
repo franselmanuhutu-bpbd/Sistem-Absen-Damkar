@@ -493,6 +493,34 @@ export function Layout({ children }: { children: ReactNode }) {
                     <p className="text-[11px] text-red-400">{ROLE_LABEL[userRole] || userRole}</p>
                   </div>
                 </button>
+                {isTauriEnvironment() && (
+                  updateInfo?.available ? (
+                    <Button
+                      type="button"
+                      onClick={() => {
+                        setOpen(false);
+                        setIsDialogOpen(true);
+                      }}
+                      className="mb-2 w-full justify-start gap-2 bg-amber-500/20 text-amber-300 hover:bg-amber-500/30 border border-amber-500/40 font-semibold animate-pulse"
+                      title={`Pembaruan v${updateInfo.version} tersedia! Klik untuk memasang.`}
+                    >
+                      <Sparkles className="h-4 w-4 text-amber-400" />
+                      Update v{updateInfo.version}
+                    </Button>
+                  ) : (
+                    <Button
+                      type="button"
+                      onClick={() => checkForUpdates(false)}
+                      disabled={isChecking}
+                      variant="ghost"
+                      className="mb-2 w-full justify-start gap-2 text-slate-400 hover:bg-white/5 hover:text-slate-200 disabled:opacity-50"
+                      title="Periksa apakah ada pembaruan versi baru di GitHub"
+                    >
+                      <RefreshCw className={`h-4 w-4 ${isChecking ? "animate-spin text-amber-400" : ""}`} />
+                      {isChecking ? "Memeriksa..." : "Periksa Pembaruan"}
+                    </Button>
+                  )
+                )}
                 <Button
                   data-testid="logout-btn-mobile"
                   onClick={handleLogout}
