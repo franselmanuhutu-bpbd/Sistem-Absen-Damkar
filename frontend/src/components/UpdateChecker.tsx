@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState, useCallback, type ReactNode } from "react";
+import React, { createContext, useContext, useEffect, useState, useCallback, useRef, type ReactNode } from "react";
 import { isTauriEnvironment } from "@/lib/api";
 import { toast } from "sonner";
 import {
@@ -48,6 +48,34 @@ export async function getAppVersion(): Promise<string> {
   return "";
 }
 
+function isAndroidTauri(): boolean {
+  return isTauriEnvironment() && typeof navigator !== "undefined" && /android/i.test(navigator.userAgent);
+}
+
+async function checkAndroidRelease(currentVersion: string) {
+  const response = await fetch(
+    "https://api.github.com/repos/franselmanuhutu-bpbd/Sistem-Absen-Damkar/releases/latest",
+    { headers: { Accept: "application/vnd.github+json" } }
+  );
+  if (!response.ok) throw new Error(`GitHub release check failed: ${response.status}`);
+
+  const release = await response.json();
+  const latestVersion = String(release.tag_name || "").replace(/^v/, "");
+  const apk = release.assets?.find(
+    (asset: { name?: string; browser_download_url?: string }) =>
+      asset.name?.endsWith(".apk") && asset.browser_download_url
+  );
+  if (!latestVersion || !apk || latestVersion === currentVersion.replace(/^v/, "")) return null;
+
+  return {
+    available: true,
+    version: latestVersion,
+    body: release.body || "",
+    downloadUrl: apk.browser_download_url,
+    mobile: true,
+  };
+}
+
 export function useUpdater() {
   const context = useContext(UpdateContext);
   if (!context) {
@@ -73,6 +101,7 @@ export function UpdateProvider({ children }: { children: ReactNode }) {
   const [isChecking, setIsChecking] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
   const [progress, setProgress] = useState<number | null>(null);
+  const isCheckingRef = useRef(false);
 
   // Ambil versi dinamis saat pertama kali mount
   useEffect(() => {
@@ -90,11 +119,26 @@ export function UpdateProvider({ children }: { children: ReactNode }) {
       return;
     }
 
+    if (isCheckingRef.current) return;
+    isCheckingRef.current = true;
     setIsChecking(true);
     const ver = cachedAppVersion || (await getAppVersion());
     const verSuffix = ver ? ` (${ver})` : "";
 
     try {
+      if (isAndroidTauri()) {
+        const update = await checkAndroidRelease(ver);
+        if (update) {
+          setUpdateInfo(update);
+          setIsDialogOpen(true);
+          if (!silent) toast.info(`Versi baru v${update.version} tersedia!`);
+        } else {
+          setUpdateInfo(null);
+          if (!silent) toast.success(`Aplikasi sudah menggunakan versi terbaru${verSuffix}.`);
+        }
+        return;
+      }
+
       const { check } = await import("@tauri-apps/plugin-updater");
       const update = await check();
 
@@ -138,6 +182,7 @@ export function UpdateProvider({ children }: { children: ReactNode }) {
         }
       }
     } finally {
+      isCheckingRef.current = false;
       setIsChecking(false);
     }
   }, []);
@@ -145,14 +190,38 @@ export function UpdateProvider({ children }: { children: ReactNode }) {
   // Startup background check (setelah 3 detik)
   useEffect(() => {
     if (!isTauriEnvironment()) return;
-    const timer = setTimeout(() => {
-      checkForUpdates(true);
-    }, 3000);
-    return () => clearTimeout(timer);
+    const startupTimer = setTimeout(() => checkForUpdates(true), 3000);
+    const interval = window.setInterval(() => checkForUpdates(true), 30 * 60 * 1000);
+    const checkWhenActive = () => {
+      if (document.visibilityState === "visible") checkForUpdates(true);
+    };
+    window.addEventListener("focus", checkWhenActive);
+    window.addEventListener("online", checkWhenActive);
+    document.addEventListener("visibilitychange", checkWhenActive);
+    return () => {
+      clearTimeout(startupTimer);
+      clearInterval(interval);
+      window.removeEventListener("focus", checkWhenActive);
+      window.removeEventListener("online", checkWhenActive);
+      document.removeEventListener("visibilitychange", checkWhenActive);
+    };
   }, [checkForUpdates]);
 
   const installUpdate = async () => {
     if (!updateInfo) return;
+    if (updateInfo.mobile) {
+      try {
+        const { openUrl } = await import("@tauri-apps/plugin-opener");
+        await openUrl(updateInfo.downloadUrl);
+        setIsDialogOpen(false);
+        toast.info("APK dibuka untuk diunduh. Android akan meminta konfirmasi pemasangan.");
+      } catch (err) {
+        console.error("[Auto-Updater] Gagal membuka APK:", err);
+        toast.error("Gagal membuka halaman unduhan APK.");
+      }
+      return;
+    }
+
     setIsDownloading(true);
     setProgress(0);
 
@@ -221,7 +290,9 @@ export function UpdateProvider({ children }: { children: ReactNode }) {
                 <span>Pembaruan Aplikasi Tersedia</span>
               </div>
               <DialogTitle className="text-xl">
-                Versi {updateInfo.version} Siap Dipasang
+                {updateInfo.mobile
+                  ? `Versi ${updateInfo.version} Tersedia`
+                  : `Versi ${updateInfo.version} Siap Dipasang`}
               </DialogTitle>
               <DialogDescription className="text-sm text-slate-600 mt-2">
                 {updateInfo.body ? (
@@ -266,12 +337,12 @@ export function UpdateProvider({ children }: { children: ReactNode }) {
                 {isDownloading ? (
                   <>
                     <RefreshCw className="h-4 w-4 animate-spin" />
-                    <span>Memasang Pembaruan...</span>
+                    <span>{updateInfo.mobile ? "Buka Unduhan APK" : "Memasang Pembaruan..."}</span>
                   </>
                 ) : (
                   <>
                     <Download className="h-4 w-4" />
-                    <span>Unduh & Perbarui</span>
+                    <span>{updateInfo.mobile ? "Unduh APK" : "Unduh & Perbarui"}</span>
                   </>
                 )}
               </Button>
@@ -290,12 +361,24 @@ export function UpdateChecker() {
 
 export async function triggerManualUpdateCheck() {
   if (!isTauriEnvironment()) {
-    toast.info("Pembaruan otomatis hanya tersedia pada versi desktop.");
+    toast.info("Pembaruan otomatis hanya tersedia pada aplikasi terpasang.");
     return;
   }
   const ver = cachedAppVersion || (await getAppVersion());
   const verSuffix = ver ? ` (${ver})` : "";
   try {
+    if (isAndroidTauri()) {
+      const update = await checkAndroidRelease(ver);
+      if (update) {
+        const { openUrl } = await import("@tauri-apps/plugin-opener");
+        await openUrl(update.downloadUrl);
+        toast.info(`Versi baru v${update.version} tersedia. APK dibuka untuk diunduh.`);
+      } else {
+        toast.success(`Aplikasi sudah menggunakan versi terbaru${verSuffix}.`);
+      }
+      return;
+    }
+
     const { check } = await import("@tauri-apps/plugin-updater");
     const update = await check();
     if (update?.available) {

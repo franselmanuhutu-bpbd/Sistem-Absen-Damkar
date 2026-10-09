@@ -11,7 +11,7 @@ on:
   workflow_dispatch:
     inputs:
       force_release:
-        description: 'Paksa build & release desktop meski tag versi sudah ada'
+        description: 'Force build & release the desktop even if the version already exists'
         required: false
         type: boolean
         default: false
@@ -21,7 +21,7 @@ permissions:
 
 jobs:
   # ==========================================
-  # JOB 1: Deploy Web / API ke Vercel
+  # JOB 1: Deploy Web / API to Vercel
   # ==========================================
   deploy-to-vercel:
     name: Deploy Web to Vercel
@@ -35,7 +35,7 @@ jobs:
           VERCEL_DEPLOY_HOOK: ${{ secrets.VERCEL_DEPLOY_HOOK }}
         run: |
           if [[ -z "$VERCEL_DEPLOY_HOOK" ]]; then
-            echo "Notice: VERCEL_DEPLOY_HOOK belum dikonfigurasi di GitHub Secrets."
+            echo "Notice: VERCEL_DEPLOY_HOOK is not congured yet on GitHub Secrets."
             exit 0
           fi
 
@@ -50,7 +50,7 @@ jobs:
 
   # ==========================================
   # JOB 2: Build & Auto Release Desktop App
-  # Berjalan otomatis ketika versi di tauri.conf.json berubah
+  # Runs automatically when tauri version changed inside tauri.conf.json
   # ==========================================
   release-desktop:
     name: Build & Release Desktop App
@@ -61,7 +61,7 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Deteksi Perubahan Versi Tauri
+      - name: Detect Tauro Version Changes
         id: version_check
         shell: bash
         run: |
@@ -135,3 +135,89 @@ jobs:
             frontend/src-tauri/target/release/bundle/nsis/Damkar.Absensi_${{ steps.version_check.outputs.version }}_x64-setup.exe
             frontend/src-tauri/target/release/bundle/nsis/Damkar.Absensi_${{ steps.version_check.outputs.version }}_x64-setup.exe.sig
             frontend/src-tauri/target/release/bundle/nsis/latest.json
+
+  android-release:
+    name: Build Android APK
+    needs: release-desktop
+    if: needs.release-desktop.result != 'failure' && needs.release-desktop.result != 'cancelled'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Read Application Version
+        id: version
+        shell: bash
+        run: echo "version=$(node -p "require('./frontend/src-tauri/tauri.conf.json').version")" >> "$GITHUB_OUTPUT"
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android SDK packages
+        run: sdkmanager "platform-tools" "platforms;android-35" "build-tools;35.0.0" "ndk;29.0.14206865"
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android,armv7-linux-androideabi,x86_64-linux-android
+
+      - name: Install Frontend Dependencies
+        working-directory: ./frontend
+        run: bun install
+
+      - name: Build Android APK
+        working-directory: ./frontend
+        run: bun run tauri:android:build
+
+      - name: Decode Android keystore
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        run: |
+          echo "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/damkar-release.keystore"
+
+      - name: Sign Android APK
+        env:
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+        run: |
+          APK_DIR="frontend/src-tauri/gen/android/app/build/outputs/apk/universal/release"
+          UNSIGNED_APK="$APK_DIR/app-universal-release-unsigned.apk"
+          ALIGNED_APK="$APK_DIR/damkar-absensi-aligned.apk"
+          SIGNED_APK="$APK_DIR/Damkar-Absensi.apk"
+
+          ZIPALIGN="$ANDROID_HOME/build-tools/35.0.0/zipalign"
+          APKSIGNER="$ANDROID_HOME/build-tools/35.0.0/apksigner"
+
+          "$ZIPALIGN" -p -f 4 "$UNSIGNED_APK" "$ALIGNED_APK"
+
+          "$APKSIGNER" sign \
+            --ks "$RUNNER_TEMP/damkar-release.keystore" \
+            --ks-key-alias "$ANDROID_KEY_ALIAS" \
+            --ks-pass "pass:$ANDROID_KEYSTORE_PASSWORD" \
+            --key-pass "pass:$ANDROID_KEY_PASSWORD" \
+            --out "$SIGNED_APK" \
+            "$ALIGNED_APK"
+
+          "$APKSIGNER" verify --verbose "$SIGNED_APK"
+
+      - name: Upload Android APK to GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release upload "v${{ steps.version.outputs.version }}" \
+            frontend/src-tauri/gen/android/app/build/outputs/apk/universal/release/Damkar-Absensi.apk \
+            --clobber

@@ -91,8 +91,10 @@ frontend/node_modules/.cache/default-development/3.pack
 .env
 .env.*
 *.env
-credentials.json
 *.key
+*.keystore
+*.jks
+credentials.json
 .credentials
 .scratches
 .kotlin
