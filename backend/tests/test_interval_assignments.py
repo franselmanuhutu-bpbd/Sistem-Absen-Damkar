@@ -47,7 +47,8 @@ async def _async_test_team_detail_empty():
     # Mock resolusi penempatan regu pada tanggal 2026-10-05: kosong (sudah di-reset)
     with patch("routers.teams.get_db", AsyncMock(return_value=mock_db)), \
          patch("routers.teams.resolve_teams_for_date", AsyncMock(return_value={})), \
-         patch("routers.teams.resolve_commander_for_date", AsyncMock(return_value=None)):
+         patch("routers.teams.resolve_commander_for_date", AsyncMock(return_value=None)), \
+         patch("routers.teams.get_active_kasubid_ids", AsyncMock(return_value=set())):
 
         # Panggil team_detail untuk tanggal yang sudah di-reset
         res = await team_detail(team_id="team-3", date="2026-10-05")

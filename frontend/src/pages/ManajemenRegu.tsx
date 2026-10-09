@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
-import { ArrowRightLeft, Flame, Star, Loader2, Pencil, Crown, History, RotateCcw, Search, X, Calendar, Clock, Sparkles, AlertTriangle } from "lucide-react";
+import { ArrowRightLeft, Flame, Star, Loader2, Pencil, Crown, History, RotateCcw, Search, X, Calendar, Clock, Sparkles, AlertTriangle, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { TableSkeleton } from "@/components/ui/table-skeleton";
 import { EmployeeSearchSelect } from "@/components/EmployeeSearchSelect";
@@ -62,6 +62,24 @@ export default function ManajemenRegu() {
   const [ksForm, setKsForm] = useState<any>(null);
   const [hist, setHist] = useState<any>(null);
   const [histData, setHistData] = useState<any[]>([]);
+  const [cmdHistory, setCmdHistory] = useState<any[]>([]);
+  const [loadingCmdHist, setLoadingCmdHist] = useState(false);
+  const [cmdConflictModal, setCmdConflictModal] = useState<{
+    open: boolean;
+    conflicts: any[];
+    candidate: {
+      team_id: string;
+      employee_id: string;
+      employee_name: string;
+      start_date: string;
+    } | null;
+    submitting: boolean;
+  }>({
+    open: false,
+    conflicts: [],
+    candidate: null,
+    submitting: false,
+  });
 
   // State konfigurasi dialog reset penempatan regu
   const [resetConfig, setResetConfig] = useState<{
@@ -209,10 +227,27 @@ export default function ManajemenRegu() {
     return allEmp.filter((e) => selectedSet.has(e.id));
   }, [allEmp, roll?.employee_ids]);
 
+  // Set ID pegawai yang menjabat Kasubid (dikecualikan dari regu dan pencarian rolling)
+  const kasubidEmpIds = useMemo(() => {
+    const s = new Set<string>();
+    (kasubid || []).forEach((k: any) => {
+      if (k.employee_id) s.add(k.employee_id);
+    });
+    (allEmp || []).forEach((e: any) => {
+      if (e.is_kasubid || e.jabatan?.toLowerCase().includes("kepala sub bidang")) {
+        s.add(e.id);
+      }
+    });
+    return s;
+  }, [kasubid, allEmp]);
+
   const filteredRollEmployees = useMemo(() => {
     if (!roll) return [];
     const q = rollSearch.trim().toLowerCase();
     return allEmp.filter((emp: any) => {
+      // Kasubid memiliki absensi mandiri, tidak boleh masuk pencarian / penempatan regu
+      if (kasubidEmpIds.has(emp.id)) return false;
+
       if (rollFilterTab === "unassigned" && emp.current_team_id) return false;
       if (rollFilterTab === "other" && (!emp.current_team_id || emp.current_team_id === roll.team_id)) return false;
 
@@ -223,13 +258,16 @@ export default function ManajemenRegu() {
       const matchJabatan = emp.jabatan ? emp.jabatan.toLowerCase().includes(q) : false;
       return matchName || matchNip || matchTeam || matchJabatan;
     });
-  }, [allEmp, roll, rollSearch, rollFilterTab]);
+  }, [allEmp, roll, rollSearch, rollFilterTab, kasubidEmpIds]);
 
-  const unassignedEmpCount = useMemo(() => allEmp.filter((e) => !e.current_team_id).length, [allEmp]);
+  const unassignedEmpCount = useMemo(
+    () => allEmp.filter((e) => !kasubidEmpIds.has(e.id) && !e.current_team_id).length,
+    [allEmp, kasubidEmpIds]
+  );
   const otherTeamsEmpCount = useMemo(() => {
     if (!roll?.team_id) return 0;
-    return allEmp.filter((e) => e.current_team_id && e.current_team_id !== roll.team_id).length;
-  }, [allEmp, roll?.team_id]);
+    return allEmp.filter((e) => !kasubidEmpIds.has(e.id) && e.current_team_id && e.current_team_id !== roll.team_id).length;
+  }, [allEmp, roll?.team_id, kasubidEmpIds]);
 
   const toggleRollEmployee = (id: string) => {
     if (!roll) return;
@@ -286,18 +324,88 @@ export default function ManajemenRegu() {
     }
   };
 
-  const submitCmd = async () => {
-    if (!cmd?.employee_id) return;
-    setSubmittingCmd(true);
+  const availableCommanderEmployees = useMemo(() => {
+    const map = new Map<string, any>();
+    (detail?.members || []).forEach((m: any) => {
+      if (!kasubidEmpIds.has(m.id)) map.set(m.id, m);
+    });
+    allEmp.filter((e: any) => e.current_team_id === activeTeam && !kasubidEmpIds.has(e.id)).forEach((e: any) => {
+      if (!map.has(e.id)) map.set(e.id, e);
+    });
+    return Array.from(map.values());
+  }, [detail?.members, allEmp, activeTeam, kasubidEmpIds]);
+
+  const loadCmdHistory = (tid = activeTeam) => {
+    if (!tid) return;
+    setLoadingCmdHist(true);
+    api
+      .get(`/teams/${tid}/commanders`)
+      .then((r) => setCmdHistory(r.data || []))
+      .catch(() => {})
+      .finally(() => setLoadingCmdHist(false));
+  };
+
+  const handleDeleteCmd = async (cmdId: string) => {
+    if (!confirm("Hapus catatan riwayat komandan ini?")) return;
     try {
-      await api.post("/commanders", { team_id: activeTeam, employee_id: cmd.employee_id, start_date: cmd.start_date });
-      toast.success("Komandan Regu ditetapkan");
-      setCmd(null);
+      await api.delete(`/commanders/${cmdId}`);
+      toast.success("Catatan riwayat komandan dihapus");
+      loadCmdHistory(activeTeam);
       loadDetail(activeTeam, selectedDate);
     } catch (e) {
       toast.error(apiError(e));
+    }
+  };
+
+  const openCmdDialog = () => {
+    setCmd({
+      employee_id: detail?.commander?.employee_id || "",
+      start_date: selectedDate,
+    });
+    loadCmdHistory(activeTeam);
+  };
+
+  const submitCmd = async (override = false) => {
+    if (!cmd?.employee_id) return;
+    setSubmittingCmd(true);
+    if (override) {
+      setCmdConflictModal((prev) => ({ ...prev, submitting: true }));
+    }
+    try {
+      await api.post("/commanders", {
+        team_id: activeTeam,
+        employee_id: cmd.employee_id,
+        start_date: cmd.start_date,
+        override,
+      });
+      toast.success("Komandan Regu berhasil ditetapkan");
+      setCmd(null);
+      setCmdConflictModal({ open: false, conflicts: [], candidate: null, submitting: false });
+      loadDetail(activeTeam, selectedDate);
+      loadCmdHistory(activeTeam);
+    } catch (e: any) {
+      const errData = e?.response?.data;
+      const detailObj = typeof errData?.detail === "object" ? errData.detail : null;
+      if (e?.response?.status === 409 && detailObj?.conflicts?.length) {
+        const empName = availableCommanderEmployees.find((m: any) => m.id === cmd.employee_id)?.nama ||
+                        allEmp.find((m: any) => m.id === cmd.employee_id)?.nama || "Komandan";
+        setCmdConflictModal({
+          open: true,
+          conflicts: detailObj.conflicts,
+          candidate: {
+            team_id: activeTeam,
+            employee_id: cmd.employee_id,
+            employee_name: empName,
+            start_date: cmd.start_date,
+          },
+          submitting: false,
+        });
+      } else {
+        toast.error(apiError(e));
+      }
     } finally {
       setSubmittingCmd(false);
+      setCmdConflictModal((prev) => ({ ...prev, submitting: false }));
     }
   };
 
@@ -392,6 +500,7 @@ export default function ManajemenRegu() {
   const curTeam = teams.find((t) => t.id === activeTeam);
 
   const filteredMembers = (detail?.members || []).filter((e: any) => {
+    if (kasubidEmpIds.has(e.id)) return false;
     const q = memberSearch.trim().toLowerCase();
     if (!q) return true;
     const matchName = e.nama ? e.nama.toLowerCase().includes(q) : false;
@@ -691,7 +800,7 @@ export default function ManajemenRegu() {
             <Badge className="gap-1.5 h-8 bg-amber-100 text-amber-700 hover:bg-amber-100">
               <Crown className="mr-1.5 h-4 w-4" /> Komandan: {detail?.commander?.nama || "—"}
             </Badge>
-            <Button size="sm" variant="outline" onClick={() => setCmd({ employee_id: "", start_date: selectedDate })} data-testid="set-commander-btn">
+            <Button size="sm" variant="outline" onClick={openCmdDialog} data-testid="set-commander-btn">
               <Crown className="mr-1.5 h-4 w-4" /> Komandan
             </Button>
             <Button size="sm" variant="outline" onClick={openHist} data-testid="team-history-btn">
@@ -1170,7 +1279,7 @@ export default function ManajemenRegu() {
 
       {/* Commander dialog */}
       <Dialog open={!!cmd} onOpenChange={(o) => !o && setCmd(null)}>
-        <DialogContent>
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Tetapkan Komandan {curTeam?.name}</DialogTitle>
             <DialogDescription className="text-xs text-slate-500">
@@ -1178,34 +1287,158 @@ export default function ManajemenRegu() {
             </DialogDescription>
           </DialogHeader>
           {cmd && (
-            <div className="space-y-3">
-              <div className="space-y-1.5">
-                <Label>Komandan (anggota regu)</Label>
-                <EmployeeSearchSelect
-                  value={cmd.employee_id}
-                  onChange={(v) => setCmd({ ...cmd, employee_id: v })}
-                  employees={detail?.members || []}
-                  placeholder="Cari & pilih komandan (nama atau NIP)..."
-                  data-testid="cmd-employee"
-                />
+            <div className="space-y-4">
+              <div className="space-y-3">
+                <div className="space-y-1.5">
+                  <Label>Komandan (anggota regu)</Label>
+                  <EmployeeSearchSelect
+                    value={cmd.employee_id}
+                    onChange={(v) => setCmd({ ...cmd, employee_id: v })}
+                    employees={availableCommanderEmployees}
+                    placeholder="Cari & pilih komandan (nama atau NIP)..."
+                    data-testid="cmd-employee"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Berlaku mulai</Label>
+                  <DatePicker
+                    value={cmd.start_date}
+                    onChange={(val) => setCmd({ ...cmd, start_date: val })}
+                    data-testid="cmd-date"
+                    className="w-full"
+                  />
+                </div>
+                <p className="rounded-lg bg-amber-50 p-2.5 text-xs text-amber-700">
+                  Komandan lama tetap tercatat pada laporan periode sebelum tanggal ini.
+                </p>
               </div>
-              <div className="space-y-1.5">
-                <Label>Berlaku mulai</Label>
-                <DatePicker
-                  value={cmd.start_date}
-                  onChange={(val) => setCmd({ ...cmd, start_date: val })}
-                  data-testid="cmd-date"
-                  className="w-full"
-                />
+
+              {/* Riwayat komandan untuk regu ini */}
+              <div className="border-t border-slate-100 pt-3">
+                <div className="flex items-center justify-between mb-2">
+                  <Label className="text-xs font-semibold text-slate-700 flex items-center gap-1.5">
+                    <History className="h-3.5 w-3.5 text-slate-500" /> Riwayat Komandan {curTeam?.name}
+                  </Label>
+                  {loadingCmdHist && <Loader2 className="h-3 w-3 animate-spin text-slate-400" />}
+                </div>
+                {cmdHistory.length === 0 ? (
+                  <p className="text-xs text-slate-400 py-1.5">Belum ada catatan riwayat komandan.</p>
+                ) : (
+                  <div className="max-h-40 overflow-y-auto rounded-md border border-slate-200 divide-y divide-slate-100">
+                    {cmdHistory.map((h, i) => (
+                      <div key={i} className="flex items-center justify-between p-2 text-xs hover:bg-slate-50">
+                        <div>
+                          <div className="font-semibold text-slate-800">{h.nama || "—"}</div>
+                          <div className="text-[11px] text-slate-500">
+                            {formatDateId(h.start_date)} s/d {h.end_date ? formatDateId(h.end_date) : "Sekarang"}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <Badge variant="outline" className={h.end_date ? "bg-slate-50 text-slate-600 border-slate-200 text-[10px]" : "bg-amber-50 text-amber-700 border-amber-200 text-[10px]"}>
+                            {h.end_date ? "Selesai" : "Aktif"}
+                          </Badge>
+                          {isAdmin && (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-6 w-6 p-0 text-slate-400 hover:text-red-600"
+                              title="Hapus riwayat komandan"
+                              onClick={() => handleDeleteCmd(h.id)}
+                            >
+                              <Trash2 className="h-3 w-3" />
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
-              <p className="rounded-lg bg-amber-50 p-2.5 text-xs text-amber-700">Komandan lama tetap tercatat pada laporan periode sebelum tanggal ini.</p>
             </div>
           )}
           <DialogFooter>
             <Button variant="outline" onClick={() => setCmd(null)} disabled={submittingCmd}>Batal</Button>
-            <Button onClick={submitCmd} disabled={!cmd?.employee_id || submittingCmd} className="bg-red-600 hover:bg-red-700" data-testid="cmd-save-btn">
+            <Button onClick={() => submitCmd(false)} disabled={!cmd?.employee_id || submittingCmd} className="bg-red-600 hover:bg-red-700" data-testid="cmd-save-btn">
               {submittingCmd && <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />}
               Simpan
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog Konfirmasi Penimpaan Komandan Regu */}
+      <Dialog
+        open={cmdConflictModal.open}
+        onOpenChange={(o) => !cmdConflictModal.submitting && setCmdConflictModal((prev) => ({ ...prev, open: o }))}
+      >
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <div className="flex items-center gap-2">
+              <div className="flex h-9 w-9 items-center justify-center rounded-full bg-amber-100 text-amber-600">
+                <AlertTriangle className="h-5 w-5" />
+              </div>
+              <div>
+                <DialogTitle>Konfirmasi Penimpaan Komandan</DialogTitle>
+                <DialogDescription className="text-xs text-slate-500">
+                  Ditemukan riwayat penugasan komandan yang bertabrakan.
+                </DialogDescription>
+              </div>
+            </div>
+          </DialogHeader>
+
+          <div className="space-y-3 py-2 text-sm">
+            <div className="rounded-lg border border-amber-200 bg-amber-50/70 p-3 text-xs text-amber-900 space-y-1">
+              <p>
+                Anda akan menetapkan <span className="font-bold">{cmdConflictModal.candidate?.employee_name}</span> sebagai Komandan{" "}
+                <span className="font-bold">{curTeam?.name}</span> mulai{" "}
+                <span className="font-bold">{cmdConflictModal.candidate?.start_date ? formatDateId(cmdConflictModal.candidate.start_date) : "—"}</span>.
+              </p>
+              <p className="text-amber-700">
+                Data komandan yang tercatat pada atau setelah tanggal tersebut akan digantikan.
+              </p>
+            </div>
+
+            <div>
+              <p className="mb-1.5 text-xs font-semibold uppercase tracking-wider text-slate-500">
+                Data Komandan yang Akan Ditimpa / Digantikan ({cmdConflictModal.conflicts.length}):
+              </p>
+              <div className="max-h-48 overflow-y-auto rounded-md border border-slate-200 divide-y divide-slate-100">
+                {cmdConflictModal.conflicts.map((c, i) => (
+                  <div key={i} className="p-2.5 text-xs flex items-center justify-between hover:bg-slate-50">
+                    <div>
+                      <div className="font-semibold text-slate-800">{c.nama}</div>
+                      <div className="text-slate-500 text-[11px]">
+                        Periode: {formatDateId(c.start_date)} s/d {c.end_date ? formatDateId(c.end_date) : "Sekarang"}
+                      </div>
+                    </div>
+                    <Badge variant="outline" className="text-[10px] bg-amber-50 text-amber-700 border-amber-200">
+                      {c.reason || "Bertabrakan"}
+                    </Badge>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <p className="text-xs text-slate-500">
+              ℹ️ Catatan: Komandan sebelum tanggal {cmdConflictModal.candidate?.start_date ? formatDateId(cmdConflictModal.candidate.start_date) : ""} (jika ada) tetap aman tersimpan pada laporan periode sebelumnya.
+            </p>
+          </div>
+
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button
+              variant="outline"
+              disabled={cmdConflictModal.submitting}
+              onClick={() => setCmdConflictModal((prev) => ({ ...prev, open: false }))}
+            >
+              Batal
+            </Button>
+            <Button
+              disabled={cmdConflictModal.submitting}
+              onClick={() => submitCmd(true)}
+              className="bg-amber-600 hover:bg-amber-700 text-white"
+            >
+              {cmdConflictModal.submitting && <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />}
+              Ya, Timpa &amp; Simpan
             </Button>
           </DialogFooter>
         </DialogContent>

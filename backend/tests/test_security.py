@@ -62,7 +62,8 @@ async def _test_employee_search_postgrest_sanitization():
     mock_db.table.return_value.select.return_value = mock_query
 
     with patch("routers.employees.get_db", AsyncMock(return_value=mock_db)), \
-         patch("routers.employees.resolve_teams_for_date", AsyncMock(return_value={})):
+         patch("routers.employees.resolve_teams_for_date", AsyncMock(return_value={})), \
+         patch("routers.employees.get_active_kasubid_ids", AsyncMock(return_value=set())):
         # Inject dangerous PostgREST filter syntax: commas, parentheses, colons, quotes
         dangerous_search = 'foo,status.eq.INACTIVE):"hack%'
         user = {"id": "user-1", "role": "operator"}

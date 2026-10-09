@@ -7,7 +7,7 @@ import uuid
 from database import get_db
 from models import EmployeeIn
 from auth import get_current_user, require_roles, clean
-from utils import now_iso, write_audit, resolve_teams_for_date
+from utils import now_iso, write_audit, resolve_teams_for_date, get_active_kasubid_ids
 
 router = APIRouter(tags=["Employees"])
 
@@ -17,6 +17,7 @@ async def list_employees(
     search: str = "",
     status: str = "",
     date: Optional[str] = None,
+    exclude_kasubid: bool = False,
     user: dict = Depends(get_current_user),
 ):
     db = await get_db()
@@ -33,13 +34,24 @@ async def list_employees(
 
     ref_date = date or _date.today().isoformat()
     team_map = await resolve_teams_for_date(ref_date)
+    kasubids = await get_active_kasubid_ids(ref_date)
     teams_res = await db.table("teams").select("*").execute()
     teams = {t["id"]: t for t in (teams_res.data or [])}
 
     for e in employees:
-        tid = team_map.get(e["id"])
-        e["current_team_id"] = tid
-        e["current_team_name"] = teams.get(tid, {}).get("name") if tid else None
+        is_kas = e["id"] in kasubids
+        e["is_kasubid"] = is_kas
+        if is_kas:
+            e["current_team_id"] = None
+            e["current_team_name"] = None
+        else:
+            tid = team_map.get(e["id"])
+            e["current_team_id"] = tid
+            e["current_team_name"] = teams.get(tid, {}).get("name") if tid else None
+
+    if exclude_kasubid:
+        employees = [e for e in employees if not e.get("is_kasubid")]
+
     return employees
 
 

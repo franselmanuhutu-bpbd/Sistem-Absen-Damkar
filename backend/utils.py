@@ -59,18 +59,22 @@ async def write_audit(user: dict, action: str, **extra):
 
 
 async def resolve_teams_for_date(date_str: str) -> dict:
-    """Return {employee_id: team_id} active on a given date (YYYY-MM-DD)."""
+    """Return {employee_id: team_id} active on a given date (YYYY-MM-DD). Excludes Kasubid."""
     db = await get_db()
+    kasubids = await get_active_kasubid_ids(date_str)
     res = await db.table("team_assignments").select("*").lte("start_date", date_str).execute()
     assignments = res.data or []
     result = {}
     for a in assignments:
+        eid = a["employee_id"]
+        if eid in kasubids:
+            continue
         end = a.get("end_date")
         if end and end < date_str:
             continue
-        prev = result.get(a["employee_id"])
+        prev = result.get(eid)
         if prev is None or a["start_date"] > prev[1]:
-            result[a["employee_id"]] = (a["team_id"], a["start_date"])
+            result[eid] = (a["team_id"], a["start_date"])
     return {k: v[0] for k, v in result.items()}
 
 
@@ -98,6 +102,8 @@ async def resolve_commander_for_date(team_id: str, date: str) -> Optional[str]:
     res = await db.table("team_commanders").select("*").eq("team_id", team_id).lte("start_date", date).execute()
     best = None
     for a in (res.data or []):
+        if a.get("end_date") and a["end_date"] < a["start_date"]:
+            continue
         if a.get("end_date") and a["end_date"] < date:
             continue
         if best is None or a["start_date"] > best["start_date"]:
@@ -115,6 +121,18 @@ async def resolve_kasubid_for_date(position_id: str, date: str) -> Optional[str]
         if best is None or a["start_date"] > best["start_date"]:
             best = a
     return best["employee_id"] if best else None
+
+
+async def get_active_kasubid_ids(date: str) -> set:
+    """Return set of employee IDs that are active Kasubid on a given date or structural Kasubid."""
+    db = await get_db()
+    k1 = await resolve_kasubid_for_date("KASUBID1", date)
+    k2 = await resolve_kasubid_for_date("KASUBID2", date)
+    ids = {eid for eid in (k1, k2) if eid}
+    res = await db.table("employees").select("id, jabatan").ilike("jabatan", "%kepala sub bidang%").execute()
+    for row in (res.data or []):
+        ids.add(row["id"])
+    return ids
 
 
 async def _compute_recap(start_month: str, end_month: str, team_id: Optional[str], category: Optional[str] = None):

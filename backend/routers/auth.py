@@ -3,8 +3,9 @@ import time
 from fastapi import APIRouter, HTTPException, Depends, Request
 
 from database import get_db
-from models import LoginIn
-from auth import verify_password, create_token, clean, get_current_user
+from models import LoginIn, ChangePasswordIn
+from auth import verify_password, create_token, clean, get_current_user, hash_password, invalidate_user_cache
+from utils import write_audit
 
 router = APIRouter(tags=["Auth"])
 
@@ -63,3 +64,28 @@ async def me(user: dict = Depends(get_current_user)):
 @router.post("/auth/logout")
 async def logout(user: dict = Depends(get_current_user)):
     return {"ok": True}
+
+
+@router.put("/auth/change-password")
+async def change_password(body: ChangePasswordIn, user: dict = Depends(get_current_user)):
+    db = await get_db()
+    res = await db.table("users").select("*").eq("id", user["id"]).execute()
+    db_user = res.data[0] if res.data else None
+    if not db_user:
+        raise HTTPException(status_code=404, detail="User tidak ditemukan")
+
+    if not verify_password(body.current_password, db_user["password_hash"]):
+        raise HTTPException(status_code=400, detail="Password lama tidak sesuai")
+
+    if len(body.new_password) < 6:
+        raise HTTPException(status_code=400, detail="Password baru minimal 6 karakter")
+
+    if body.current_password == body.new_password:
+        raise HTTPException(status_code=400, detail="Password baru tidak boleh sama dengan password lama")
+
+    new_hash = hash_password(body.new_password)
+    await db.table("users").update({"password_hash": new_hash}).eq("id", user["id"]).execute()
+    invalidate_user_cache(user["id"])
+    await write_audit(user, "Ubah password mandiri", detail=f"Email: {user.get('email')}")
+    return {"ok": True, "message": "Password berhasil diperbarui"}
+

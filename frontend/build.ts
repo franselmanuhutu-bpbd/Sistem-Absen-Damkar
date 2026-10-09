@@ -7,6 +7,13 @@ await rm(outdir, { recursive: true, force: true });
 
 const entrypoints = [...new Bun.Glob("src/**/*.html").scanSync()];
 
+// For production builds (default when building dist), always target the production Vercel API
+// unless an explicit PROD_API_BASE_URL is provided. Localhost dev URLs in .env are ignored.
+let targetApiUrl = process.env.PROD_API_BASE_URL || process.env.API_BASE_URL || "";
+if (!targetApiUrl || targetApiUrl.includes("localhost") || targetApiUrl.includes("127.0.0.1")) {
+  targetApiUrl = "https://sistem-absen-damkar.vercel.app/api";
+}
+
 const result = await Bun.build({
   entrypoints,
   outdir,
@@ -15,8 +22,8 @@ const result = await Bun.build({
   target: "browser",
   sourcemap: "linked",
   define: {
-    "process.env.NODE_ENV": JSON.stringify(process.env.NODE_ENV || "production"),
-    "process.env.API_BASE_URL": JSON.stringify(process.env.API_BASE_URL || ""),
+    "process.env.NODE_ENV": JSON.stringify("production"),
+    "process.env.API_BASE_URL": JSON.stringify(targetApiUrl),
   },
 });
 

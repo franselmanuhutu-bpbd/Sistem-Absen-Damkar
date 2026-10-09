@@ -1,5 +1,6 @@
 import axios, { type AxiosInstance, type InternalAxiosRequestConfig, type AxiosResponse } from "axios";
 
+export const DEFAULT_DEV_API_URL = "http://localhost:8000/api";
 export const DEFAULT_VERCEL_API_URL = "https://sistem-absen-damkar.vercel.app/api";
 
 export function isTauriEnvironment(): boolean {
@@ -13,11 +14,46 @@ export function isTauriEnvironment(): boolean {
   );
 }
 
+export function isDevEnvironment(): boolean {
+  if (typeof window !== "undefined") {
+    const host = window.location.hostname;
+    const protocol = window.location.protocol;
+
+    // Production Tauri app uses custom protocol or tauri.localhost without dev port
+    if (host === "tauri.localhost" || protocol === "tauri:" || protocol === "asset:") {
+      return false;
+    }
+
+    // Production Vercel web deployment
+    if (host.includes("vercel.app") || host === "sistem-absen-damkar.vercel.app") {
+      return false;
+    }
+
+    // Local development (browser or Tauri devUrl http://localhost:3000)
+    if (host === "localhost" || host === "127.0.0.1" || host === "0.0.0.0") {
+      return true;
+    }
+  }
+
+  // Fallback to process.env.NODE_ENV
+  try {
+    if (typeof process !== "undefined" && process?.env?.NODE_ENV) {
+      return process.env.NODE_ENV !== "production";
+    }
+  } catch {
+    // Process is not defined in standard browser context
+  }
+
+  return false;
+}
+
 export function getApiBase(): string {
-  // 1. Explicit override saved in localStorage (useful for switching targets)
+  // 1. Explicit override saved in localStorage (useful for manual testing / toggle in console)
   if (typeof window !== "undefined") {
     const override = localStorage.getItem("damkar_api_url");
-    if (override && override.trim()) return override.trim();
+    if (override && override.trim()) {
+      return override.trim();
+    }
   }
 
   // 2. Build-time or runtime environment variable (browser-safe check)
@@ -30,22 +66,41 @@ export function getApiBase(): string {
     // Process is not defined in standard browser context
   }
   if (envUrl && envUrl.trim()) {
-    return envUrl.trim();
+    // Guard: ignore localhost env variable in production builds
+    if (!isDevEnvironment() && (envUrl.includes("localhost") || envUrl.includes("127.0.0.1"))) {
+      // fallback to production Vercel
+    } else {
+      return envUrl.trim();
+    }
   }
 
-  // 3. Desktop Tauri App (dev & release)
-  // Inside Tauri desktop webview, relative "/api" fails because there is no local backend server.
-  // Automatically points to the Vercel API.
+  // 3. Development environment (both "bun run dev" in browser and "tauri dev" in desktop)
+  // Connects to local FastAPI backend on port 8000
+  if (isDevEnvironment()) {
+    return DEFAULT_DEV_API_URL;
+  }
+
+  // 4. Production Tauri desktop app (built / signed installer)
+  // Inside packaged desktop app, relative "/api" fails, so use production Vercel API
   if (isTauriEnvironment()) {
     return DEFAULT_VERCEL_API_URL;
   }
 
-  // 4. Standard Web Browser (Vercel web deployment or dev proxy)
+  // 5. Standard Web Browser (Vercel web deployment)
   return "/api";
 }
 
 export const API_BASE = getApiBase();
 export const TOKEN_KEY = "damkar_token";
+
+// Log active API target in dev mode for easy developer verification
+if (typeof window !== "undefined" && isDevEnvironment()) {
+  console.info(
+    `%c[Damkar API]%c Dev Mode -> Terhubung ke: ${API_BASE} (${isTauriEnvironment() ? "Tauri Desktop Dev" : "Web Dev"})`,
+    "color: #ef4444; font-weight: bold;",
+    "color: #0284c7;"
+  );
+}
 
 async function tauriAxiosAdapter(config: InternalAxiosRequestConfig): Promise<AxiosResponse> {
   const { fetch: tauriFetch } = await import("@tauri-apps/plugin-http");
@@ -141,12 +196,15 @@ const api: AxiosInstance = axios.create({
 
 api.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {
+    // Dynamically ensure the correct baseURL is applied (supports dev mode and localStorage overrides)
+    const activeBase = getApiBase();
+    if (!config.baseURL || config.baseURL === "/api" || isTauriEnvironment() || isDevEnvironment()) {
+      config.baseURL = activeBase;
+    }
+
     // Force native Tauri adapter inside desktop app to bypass any CORS restrictions
     if (isTauriEnvironment()) {
       config.adapter = tauriAxiosAdapter;
-      if (!config.baseURL || config.baseURL === "/api") {
-        config.baseURL = getApiBase();
-      }
     }
 
     const token = localStorage.getItem(TOKEN_KEY);

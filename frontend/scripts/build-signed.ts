@@ -18,6 +18,9 @@ if (!privateKey) {
 
 const env = {
   ...process.env,
+  NODE_ENV: "production",
+  API_BASE_URL: "https://sistem-absen-damkar.vercel.app/api",
+  BACKEND_URL: "https://sistem-absen-damkar.vercel.app",
   TAURI_SIGNING_PRIVATE_KEY: privateKey,
 };
 

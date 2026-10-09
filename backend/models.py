@@ -7,6 +7,12 @@ class LoginIn(BaseModel):
     password: str
 
 
+class ChangePasswordIn(BaseModel):
+    current_password: str
+    new_password: str
+
+
+
 class EmployeeIn(BaseModel):
     nama: str
     nip: str = ""
@@ -62,6 +68,8 @@ class CommanderIn(BaseModel):
     team_id: str
     employee_id: str
     start_date: str
+    override: Optional[bool] = False
+
 
 
 class KasubidIn(BaseModel):

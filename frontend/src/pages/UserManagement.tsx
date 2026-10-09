@@ -10,9 +10,10 @@ import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
-import { UserPlus, Pencil, Power } from "lucide-react";
+import { UserPlus, Pencil, Power, KeyRound } from "lucide-react";
 import { toast } from "sonner";
 import { motion } from "framer-motion";
+import { ChangePasswordDialog } from "@/components/ChangePasswordDialog";
 
 export default function UserManagement() {
   const { user } = useAuth();
@@ -20,6 +21,7 @@ export default function UserManagement() {
   const [employees, setEmployees] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [form, setForm] = useState<any>(null);
+  const [changePwdOpen, setChangePwdOpen] = useState(false);
 
   const load = async () => {
     setLoading(true);
@@ -67,9 +69,19 @@ export default function UserManagement() {
             <p className="text-sm text-slate-500">{users.length} user terdaftar</p>
           )}
         </div>
-        <Button onClick={() => setForm({ name: "", email: "", password: "", role: "operator", status: "ACTIVE", employee_id: "" })} className="gap-2 bg-red-600 hover:bg-red-700" data-testid="add-user-btn">
-          <UserPlus className="h-4 w-4" /> Tambah User
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            onClick={() => setChangePwdOpen(true)}
+            className="gap-2"
+            data-testid="change-own-password-btn"
+          >
+            <KeyRound className="h-4 w-4" /> Ubah Password Saya
+          </Button>
+          <Button onClick={() => setForm({ name: "", email: "", password: "", role: "operator", status: "ACTIVE", employee_id: "" })} className="gap-2 bg-red-600 hover:bg-red-700" data-testid="add-user-btn">
+            <UserPlus className="h-4 w-4" /> Tambah User
+          </Button>
+        </div>
       </div>
 
       <motion.div
@@ -190,6 +202,8 @@ export default function UserManagement() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <ChangePasswordDialog open={changePwdOpen} onOpenChange={setChangePwdOpen} />
     </div>
   );
 }

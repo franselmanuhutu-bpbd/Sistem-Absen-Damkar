@@ -25,10 +25,12 @@ import {
   PanelLeftOpen,
   Sparkles,
   RefreshCw,
+  KeyRound,
   type LucideIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { NetworkStatusBadge } from "./NetworkStatusBadge";
+import { ChangePasswordDialog } from "./ChangePasswordDialog";
 import { motion, AnimatePresence } from "framer-motion";
 import { isTauriEnvironment } from "@/lib/api";
 import { useUpdater } from "@/components/UpdateChecker";
@@ -72,6 +74,7 @@ export function Layout({ children }: { children: ReactNode }) {
   const { updateInfo, isChecking, checkForUpdates, setIsDialogOpen } = useUpdater();
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
+  const [changePwdOpen, setChangePwdOpen] = useState(false);
   const [collapsed, setCollapsed] = useState<boolean>(() => {
     if (typeof window !== "undefined") {
       return localStorage.getItem("damkar_sidebar_collapsed") === "true";
@@ -275,6 +278,17 @@ export function Layout({ children }: { children: ReactNode }) {
               <motion.button
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
+                data-testid="user-profile-btn-collapsed"
+                onClick={() => setChangePwdOpen(true)}
+                className="flex h-9 w-9 items-center justify-center rounded-full bg-slate-700 text-sm font-bold text-white uppercase hover:bg-red-600 transition-colors"
+                title={`Pengaturan Akun & Password: ${userName}`}
+              >
+                {userName[0] || "U"}
+              </motion.button>
+
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
                 data-testid="logout-btn-collapsed"
                 onClick={handleLogout}
                 className="flex h-9 w-9 items-center justify-center rounded-lg text-slate-400 hover:bg-white/10 hover:text-rose-400 transition-colors"
@@ -285,33 +299,42 @@ export function Layout({ children }: { children: ReactNode }) {
             </div>
           ) : (
             <>
-              <div className="flex items-center gap-3 mb-2.5">
-                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-slate-700 text-sm font-bold text-white uppercase">
+              {/* Clickable Username & Role row to open User Settings / Change Password */}
+              <motion.button
+                type="button"
+                whileHover={{ scale: 1.01 }}
+                whileTap={{ scale: 0.98 }}
+                onClick={() => setChangePwdOpen(true)}
+                data-testid="user-profile-btn"
+                className="w-full flex items-center gap-3 mb-2.5 p-2 -mx-2 rounded-xl text-left hover:bg-white/10 transition-colors group cursor-pointer focus:outline-none focus:ring-1 focus:ring-white/20"
+                title="Klik untuk membuka Pengaturan Akun & Ubah Password"
+              >
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-slate-700 text-sm font-bold text-white uppercase group-hover:bg-red-600 transition-colors shadow-sm">
                   {userName[0] || "U"}
                 </div>
-                <motion.div
-                  initial={{ opacity: 0, x: -12 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ duration: 0.2, ease: "easeOut" }}
-                  className="min-w-0 flex-1"
-                >
-                  <p className="truncate text-sm font-semibold text-white leading-tight">{userName}</p>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center justify-between gap-1.5">
+                    <p className="truncate text-sm font-semibold text-white leading-tight group-hover:text-amber-200 transition-colors">
+                      {userName}
+                    </p>
+                    <Settings className="h-3.5 w-3.5 text-slate-400 group-hover:text-white transition-colors shrink-0" />
+                  </div>
                   <p className="text-[11px] text-red-400 truncate mt-0.5">{ROLE_LABEL[userRole] || userRole}</p>
-                </motion.div>
-              </div>
+                </div>
+              </motion.button>
 
               <motion.div
                 initial={{ opacity: 0, x: -12 }}
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ duration: 0.2, delay: 0.04, ease: "easeOut" }}
-                className="flex items-center gap-1"
+                className="flex items-center gap-1.5"
               >
                 {isTauriEnvironment() && (
                   updateInfo?.available ? (
                     <Button
                       type="button"
                       onClick={() => setIsDialogOpen(true)}
-                      className="justify-start gap-1.5 bg-amber-500/20 text-amber-300 hover:bg-amber-500/30 border border-amber-500/40 h-8 px-2 text-xs font-semibold animate-pulse"
+                      className="flex-1 justify-start gap-1.5 bg-amber-500/20 text-amber-300 hover:bg-amber-500/30 border border-amber-500/40 h-8 px-2 text-xs font-semibold animate-pulse"
                       title={`Pembaruan v${updateInfo.version} tersedia! Klik untuk memasang.`}
                     >
                       <Sparkles className="h-3.5 w-3.5 text-amber-400" /> Update v{updateInfo.version}
@@ -323,7 +346,7 @@ export function Layout({ children }: { children: ReactNode }) {
                       disabled={isChecking}
                       variant="ghost"
                       size="sm"
-                      className="justify-start gap-1.5 text-slate-400 hover:bg-white/5 hover:text-slate-200 h-8 px-2 text-xs disabled:opacity-50"
+                      className="flex-1 justify-start gap-1.5 text-slate-400 hover:bg-white/5 hover:text-slate-200 h-8 px-2 text-xs disabled:opacity-50"
                       title="Periksa apakah ada pembaruan versi baru di GitHub"
                     >
                       <RefreshCw className={`h-3 w-3 ${isChecking ? "animate-spin text-amber-400" : ""}`} />
@@ -336,7 +359,7 @@ export function Layout({ children }: { children: ReactNode }) {
                   onClick={handleLogout}
                   variant="ghost"
                   size="sm"
-                  className="flex-1 justify-start gap-2 text-slate-300 hover:bg-white/5 hover:text-white h-8 px-2 text-xs"
+                  className={`${isTauriEnvironment() ? "" : "flex-1"} justify-start gap-1.5 text-slate-300 hover:bg-white/5 hover:text-white h-8 px-2 text-xs`}
                 >
                   <LogOut className="h-3.5 w-3.5" /> Keluar
                 </Button>
@@ -436,15 +459,27 @@ export function Layout({ children }: { children: ReactNode }) {
 
               {/* Mobile User Profile & Logout */}
               <div className="border-t border-white/10 p-4">
-                <div className="flex items-center gap-3 mb-3">
-                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-slate-700 text-sm font-bold text-white uppercase">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setOpen(false);
+                    setChangePwdOpen(true);
+                  }}
+                  className="w-full flex items-center gap-3 mb-3 p-2 -mx-2 rounded-xl text-left hover:bg-white/10 transition-colors group cursor-pointer focus:outline-none focus:ring-1 focus:ring-white/20"
+                  title="Klik untuk membuka Pengaturan Akun & Ubah Password"
+                  data-testid="user-profile-btn-mobile"
+                >
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-slate-700 text-sm font-bold text-white uppercase group-hover:bg-red-600 transition-colors shadow-sm">
                     {userName[0] || "U"}
                   </div>
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-semibold text-white">{userName}</p>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center justify-between gap-1">
+                      <p className="truncate text-sm font-semibold text-white group-hover:text-amber-200 transition-colors">{userName}</p>
+                      <Settings className="h-3.5 w-3.5 text-slate-400 group-hover:text-white transition-colors shrink-0" />
+                    </div>
                     <p className="text-[11px] text-red-400">{ROLE_LABEL[userRole] || userRole}</p>
                   </div>
-                </div>
+                </button>
                 <Button
                   data-testid="logout-btn-mobile"
                   onClick={handleLogout}
@@ -497,6 +532,8 @@ export function Layout({ children }: { children: ReactNode }) {
           {children}
         </motion.main>
       </div>
+
+      <ChangePasswordDialog open={changePwdOpen} onOpenChange={setChangePwdOpen} />
     </div>
   );
 }

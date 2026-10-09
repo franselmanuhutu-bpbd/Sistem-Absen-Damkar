@@ -7,7 +7,7 @@ from config import STATUSES
 from database import get_db
 from models import BatchAttendanceIn
 from auth import get_current_user, require_roles
-from utils import now_iso, write_audit, resolve_teams_for_date, resolve_commander_for_date
+from utils import now_iso, write_audit, resolve_teams_for_date, resolve_commander_for_date, get_active_kasubid_ids
 
 router = APIRouter(tags=["Attendance"])
 
@@ -15,27 +15,29 @@ router = APIRouter(tags=["Attendance"])
 @router.get("/attendance/roster")
 async def attendance_roster(date: str, team_id: str, user: dict = Depends(get_current_user)):
     db = await get_db()
-    # Resolusi penempatan regu aktif pada tanggal yang diminta
+    # Resolusi penempatan regu aktif pada tanggal yang diminta (sudah mengecualikan Kasubid)
     team_map = await resolve_teams_for_date(date)
+    kasubids = await get_active_kasubid_ids(date)
 
     rec_res = await db.table("attendance").select("*").eq("date", date).execute()
     records = rec_res.data or []
     status_map = {r["employee_id"]: r["status"] for r in records}
-    # Kumpulkan ID pegawai dari absensi dan penempatan regu aktif
-    att_team_eids = {r["employee_id"] for r in records if r.get("team_id") == team_id}
+    # Kumpulkan ID pegawai dari absensi dan penempatan regu aktif (tanpa Kasubid)
+    att_team_eids = {r["employee_id"] for r in records if r.get("team_id") == team_id and r.get("employee_id") not in kasubids}
     assigned_eids = {eid for eid, tid in team_map.items() if tid == team_id}
 
     # PRIORITAS SUMBER KEBENARAN ROSTER REGU:
     # 1. assigned_eids: Anggota yang ditempatkan di regu ini pada tanggal tersebut (Single Source of Truth)
     # 2. att_team_eids: Fallback jika tabel penempatan kosong pada tanggal historis terkait
-    # Jika tidak ada penempatan (misalnya setelah di-reset atau belum ditempatkan), kembalikan daftar kosong.
-    # PENTING: JANGAN fallback ke today_eids agar tanggal yang di-reset tidak menampilkan anggota hari ini.
+    # Kasubid dikecualikan sepenuhnya karena memiliki absensi tersendiri (Absensi Kasubid).
     if assigned_eids:
         target_ids = assigned_eids
     elif att_team_eids:
         target_ids = att_team_eids
     else:
         target_ids = set()
+
+    target_ids = {eid for eid in target_ids if eid not in kasubids}
 
     if not target_ids:
         return []

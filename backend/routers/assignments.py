@@ -6,7 +6,7 @@ import uuid
 from database import get_db
 from models import AssignmentIn, BatchAssignmentIn, ResetAssignmentsIn
 from auth import get_current_user, require_roles, clean
-from utils import now_iso, write_audit
+from utils import now_iso, write_audit, get_active_kasubid_ids
 
 router = APIRouter(tags=["Assignments"])
 
@@ -211,6 +211,11 @@ async def create_assignment(body: AssignmentIn, user: dict = Depends(require_rol
     if not emp or not team:
         raise HTTPException(status_code=404, detail="Pegawai / Regu tidak ditemukan")
 
+    # Kasubid tidak boleh ditempatkan ke regu
+    kasubids = await get_active_kasubid_ids(body.start_date)
+    if body.employee_id in kasubids:
+        raise HTTPException(status_code=400, detail=f"Pegawai {emp['nama']} adalah Kasubid dan tidak dapat ditempatkan ke regu.")
+
     # Terapkan algoritma penataan interval temporal
     doc = await apply_interval_assignment(
         db=db,
@@ -248,6 +253,13 @@ async def create_batch_assignment(body: BatchAssignmentIn, user: dict = Depends(
     # Ambil data nama pegawai untuk preview audit log
     emp_res = await db.table("employees").select("id, nama").in_("id", body.employee_ids).execute()
     emps = {e["id"]: e["nama"] for e in (emp_res.data or [])}
+
+    # Kasubid tidak boleh ditempatkan ke regu
+    kasubids = await get_active_kasubid_ids(body.start_date)
+    kasubid_in_list = [eid for eid in body.employee_ids if eid in kasubids]
+    if kasubid_in_list:
+        k_names = [emps.get(eid, eid) for eid in kasubid_in_list]
+        raise HTTPException(status_code=400, detail=f"Pegawai ({', '.join(k_names)}) adalah Kasubid dan tidak dapat ditempatkan ke regu.")
 
     # Terapkan pemotongan interval dan simpan penempatan untuk setiap pegawai yang dipilih
     success_count = 0

@@ -54,6 +54,15 @@ async def set_kasubid(body: KasubidIn, user: dict = Depends(require_roles("admin
         "start_date": body.start_date, "end_date": None, "created_at": now_iso(), "updated_at": now_iso(),
     }
     await db.table("sub_unit_assignments").insert(doc).execute()
+
+    # Tutup penempatan regu jika pegawai sebelumnya berada di suatu regu
+    active_team_assigns = (await db.table("team_assignments").select("*").eq("employee_id", body.employee_id).execute()).data or []
+    for ta in active_team_assigns:
+        if ta.get("end_date") is None or ta["end_date"] >= body.start_date:
+            if ta["start_date"] < body.start_date:
+                await db.table("team_assignments").update({"end_date": prev_day, "updated_at": now_iso()}).eq("id", ta["id"]).execute()
+            else:
+                await db.table("team_assignments").delete().eq("id", ta["id"]).execute()
     label = dict(KASUBID_POSITIONS)[body.position_id]
     prev_eid = await resolve_kasubid_for_date(body.position_id, prev_day)
     prev_emp = (await db.table("employees").select("*").eq("id", prev_eid).execute()).data if prev_eid else None

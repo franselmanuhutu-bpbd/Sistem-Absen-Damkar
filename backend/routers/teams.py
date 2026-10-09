@@ -7,7 +7,7 @@ from models import TeamRenameIn, CommanderIn
 from auth import get_current_user, require_roles, clean
 from utils import (
     now_iso, write_audit, resolve_teams_for_date,
-    resolve_commander_for_date
+    resolve_commander_for_date, get_active_kasubid_ids
 )
 
 router = APIRouter(tags=["Teams"])
@@ -64,21 +64,96 @@ async def set_commander(body: CommanderIn, user: dict = Depends(require_roles("a
         raise HTTPException(status_code=404, detail="Pegawai / Regu tidak ditemukan")
     prev_day = (_date.fromisoformat(body.start_date) - timedelta(days=1)).isoformat()
     existing = (await db.table("team_commanders").select("*").eq("team_id", body.team_id).execute()).data or []
+
+    # Map nama pegawai untuk detail info konflik
+    emps_all = {e["id"]: e.get("nama", "—") for e in ((await db.table("employees").select("id, nama").execute()).data or [])}
+
+    # Deteksi konflik periode komandan:
+    # 1. Record yang rusak / tidak valid (end_date < start_date)
+    # 2. Record yang tercatat pada atau setelah body.start_date (start_date >= body.start_date)
+    # 3. Record komandan sebelum body.start_date yang memiliki end_date pasti melampaui prev_day
+    conflicts = []
     for a in existing:
-        a_end = a.get("end_date") or "9999-12-31"
-        if a.get("end_date") is None and a["start_date"] <= body.start_date:
+        a_end = a.get("end_date")
+        if a_end and a_end < a["start_date"]:
+            conflicts.append({
+                "id": a["id"],
+                "employee_id": a["employee_id"],
+                "nama": emps_all.get(a["employee_id"], "—"),
+                "start_date": a["start_date"],
+                "end_date": a_end,
+                "reason": "Data periode komandan tidak valid (tanggal selesai < tanggal mulai)"
+            })
             continue
-        if a["start_date"] <= "9999-12-31" and a_end >= body.start_date:
-            raise HTTPException(status_code=400, detail="Periode komandan bertabrakan dengan data sebelumnya.")
+
+        if a["start_date"] >= body.start_date:
+            conflicts.append({
+                "id": a["id"],
+                "employee_id": a["employee_id"],
+                "nama": emps_all.get(a["employee_id"], "—"),
+                "start_date": a["start_date"],
+                "end_date": a_end,
+                "reason": "Komandan tercatat pada atau setelah tanggal mulai baru"
+            })
+            continue
+
+        if a["start_date"] < body.start_date and a_end and a_end > prev_day:
+            conflicts.append({
+                "id": a["id"],
+                "employee_id": a["employee_id"],
+                "nama": emps_all.get(a["employee_id"], "—"),
+                "start_date": a["start_date"],
+                "end_date": a_end,
+                "reason": "Periode komandan sebelumnya melampaui tanggal mulai baru"
+            })
+            continue
+
+    if conflicts and not body.override:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "message": "Periode komandan bertabrakan dengan data sebelumnya.",
+                "conflicts": conflicts
+            }
+        )
+
+    # Jika konfirmasi override disetujui (atau tidak ada konflik):
+    # Bersihkan record yang bertabrakan/rusak
+    for c in conflicts:
+        await db.table("team_commanders").delete().eq("id", c["id"]).execute()
+
+    # Tutup periode komandan sebelumnya yang masih terbuka atau melampaui prev_day
     for a in existing:
-        if a.get("end_date") is None and a["start_date"] <= body.start_date:
-            await db.table("team_commanders").update({"end_date": prev_day, "updated_at": now_iso()}).eq("id", a["id"]).execute()
-    doc = {"id": str(uuid.uuid4()), "team_id": body.team_id, "employee_id": body.employee_id,
-           "start_date": body.start_date, "end_date": None, "created_at": now_iso(), "updated_at": now_iso()}
+        if a["start_date"] < body.start_date:
+            if a.get("end_date") is None or (a.get("end_date") and a["end_date"] > prev_day):
+                await db.table("team_commanders").update({"end_date": prev_day, "updated_at": now_iso()}).eq("id", a["id"]).execute()
+
+    doc = {
+        "id": str(uuid.uuid4()),
+        "team_id": body.team_id,
+        "employee_id": body.employee_id,
+        "start_date": body.start_date,
+        "end_date": None,
+        "created_at": now_iso(),
+        "updated_at": now_iso()
+    }
     await db.table("team_commanders").insert(doc).execute()
     await write_audit(user, "Menetapkan Komandan Regu", employee_name=emp[0]["nama"],
-                      detail=f"{team[0]['name']} mulai {body.start_date}")
+                      detail=f"{team[0]['name']} mulai {body.start_date}" + (" (Timpa riwayat bertabrakan)" if conflicts else ""))
     return clean(doc)
+
+
+@router.delete("/commanders/{cmd_id}")
+async def delete_commander(cmd_id: str, user: dict = Depends(require_roles("admin"))):
+    db = await get_db()
+    existing = (await db.table("team_commanders").select("*").eq("id", cmd_id).execute()).data
+    if not existing:
+        raise HTTPException(status_code=404, detail="Data komandan tidak ditemukan")
+    row = existing[0]
+    await db.table("team_commanders").delete().eq("id", cmd_id).execute()
+    await write_audit(user, "Menghapus Riwayat Komandan", detail=f"ID {cmd_id} (mulai {row.get('start_date')})")
+    return {"ok": True}
+
 
 
 @router.get("/teams/{team_id}/detail")
@@ -110,6 +185,9 @@ async def team_detail(team_id: str, date: str = None, user: dict = Depends(get_c
         target_ids = att_eids
     else:
         target_ids = set()
+
+    kasubids = await get_active_kasubid_ids(ref)
+    target_ids = {eid for eid in target_ids if eid not in kasubids}
     ids = list(target_ids)
 
     # Ambil data pegawai aktif yang terdaftar di regu pada tanggal tersebut
