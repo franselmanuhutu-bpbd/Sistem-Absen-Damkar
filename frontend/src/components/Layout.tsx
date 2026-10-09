@@ -252,15 +252,17 @@ export function Layout({ children }: { children: ReactNode }) {
         <div className="border-t border-white/10 p-3">
           {collapsed ? (
             <div className="flex flex-col items-center gap-2">
-              <div
-                className="group relative flex h-9 w-9 items-center justify-center rounded-full bg-slate-700 text-sm font-bold text-white uppercase cursor-default"
-                title={`${userName} (${ROLE_LABEL[userRole] || userRole})`}
+              
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                data-testid="user-profile-btn-collapsed"
+                onClick={() => setChangePwdOpen(true)}
+                className="flex h-9 w-9 items-center justify-center rounded-full bg-slate-700 text-sm font-bold text-white uppercase hover:bg-red-600 transition-colors"
+                title={`Pengaturan Akun & Password: ${userName}`}
               >
                 {userName[0] || "U"}
-                <span className="pointer-events-none fixed left-[84px] z-50 hidden rounded-md bg-slate-900 px-2.5 py-1 text-xs font-semibold text-white shadow-xl border border-slate-700/60 group-hover:block whitespace-nowrap">
-                  {userName} — {ROLE_LABEL[userRole] || userRole}
-                </span>
-              </div>
+              </motion.button>
 
               {isTauriEnvironment() && (
                 updateInfo?.available ? (
@@ -290,17 +292,6 @@ export function Layout({ children }: { children: ReactNode }) {
                   </motion.button>
                 )
               )}
-
-              <motion.button
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                data-testid="user-profile-btn-collapsed"
-                onClick={() => setChangePwdOpen(true)}
-                className="flex h-9 w-9 items-center justify-center rounded-full bg-slate-700 text-sm font-bold text-white uppercase hover:bg-red-600 transition-colors"
-                title={`Pengaturan Akun & Password: ${userName}`}
-              >
-                {userName[0] || "U"}
-              </motion.button>
 
               <motion.button
                 whileHover={{ scale: 1.05 }}

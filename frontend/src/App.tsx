@@ -68,7 +68,7 @@ export function App() {
             </Routes>
           </NavigationGuardProvider>
         </BrowserRouter>
-        <Toaster position="top-right" richColors />
+        <Toaster position="bottom-right" richColors />
       </UpdateProvider>
     </AuthProvider>
   );

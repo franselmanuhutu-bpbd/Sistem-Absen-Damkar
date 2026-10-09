@@ -1,4 +1,48 @@
 import api from "./api";
+import { isTauri } from "@tauri-apps/api/core";
+import {
+  isPermissionGranted,
+  requestPermission,
+  sendNotification,
+} from "@tauri-apps/plugin-notification";
+
+const NATIVE_PUSH_ENABLED_KEY = "damkar.native-push-enabled";
+
+export function isNativePushRuntime(): boolean {
+  return isTauri();
+}
+
+export function isNativePushEnabled(): boolean {
+  return isNativePushRuntime() && localStorage.getItem(NATIVE_PUSH_ENABLED_KEY) === "true";
+}
+
+export async function subscribeToNativePush(): Promise<{ success: boolean; error?: string }> {
+  try {
+    let permissionGranted = await isPermissionGranted();
+    if (!permissionGranted) {
+      permissionGranted = (await requestPermission()) === "granted";
+    }
+    if (!permissionGranted) {
+      return { success: false, error: "Izin notifikasi desktop tidak diberikan." };
+    }
+    localStorage.setItem(NATIVE_PUSH_ENABLED_KEY, "true");
+    return { success: true };
+  } catch (err: any) {
+    console.error("Failed to enable native notifications:", err);
+    return { success: false, error: err?.message || "Gagal mengaktifkan notifikasi desktop." };
+  }
+}
+
+export function unsubscribeFromNativePush(): { success: boolean } {
+  localStorage.removeItem(NATIVE_PUSH_ENABLED_KEY);
+  return { success: true };
+}
+
+export async function sendNativePushNotification(title: string, body: string): Promise<void> {
+  if (isNativePushEnabled()) {
+    await sendNotification({ title, body });
+  }
+}
 
 function urlBase64ToUint8Array(base64String: string): Uint8Array {
   const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
@@ -12,6 +56,7 @@ function urlBase64ToUint8Array(base64String: string): Uint8Array {
 }
 
 export function isPushSupported(): boolean {
+  if (isNativePushRuntime()) return true;
   return (
     typeof window !== "undefined" &&
     "serviceWorker" in navigator &&
@@ -28,6 +73,7 @@ export function getNotificationPermission(): NotificationPermission {
 }
 
 export async function getExistingSubscription(): Promise<PushSubscription | null> {
+  if (isNativePushRuntime()) return null;
   if (!isPushSupported()) return null;
   try {
     const registration = await navigator.serviceWorker.getRegistration("/sw.js");
@@ -50,6 +96,9 @@ export async function registerServiceWorker(): Promise<ServiceWorkerRegistration
 }
 
 export async function subscribeToPush(): Promise<{ success: boolean; subscription?: PushSubscription; error?: string }> {
+  if (isNativePushRuntime()) {
+    return subscribeToNativePush();
+  }
   if (!isPushSupported()) {
     return { success: false, error: "Browser Anda tidak mendukung Web Push Notifications." };
   }
@@ -123,6 +172,9 @@ export async function subscribeToPush(): Promise<{ success: boolean; subscriptio
 }
 
 export async function unsubscribeFromPush(): Promise<{ success: boolean; error?: string }> {
+  if (isNativePushRuntime()) {
+    return unsubscribeFromNativePush();
+  }
   if (!isPushSupported()) return { success: true };
   try {
     const registration = await navigator.serviceWorker.getRegistration("/sw.js");

@@ -28,6 +28,9 @@ import {
   getExistingSubscription,
   subscribeToPush,
   unsubscribeFromPush,
+  isNativePushRuntime,
+  isNativePushEnabled,
+  sendNativePushNotification,
 } from "@/lib/push";
 import JSZip from "jszip";
 
@@ -84,8 +87,12 @@ export default function LaporanExport() {
     setPushSupported(supported);
     if (!supported) return;
 
-    const sub = await getExistingSubscription();
-    setPushSubscribed(!!sub);
+    if (isNativePushRuntime()) {
+      setPushSubscribed(isNativePushEnabled());
+    } else {
+      const sub = await getExistingSubscription();
+      setPushSubscribed(!!sub);
+    }
   };
 
   useEffect(() => {
@@ -95,6 +102,35 @@ export default function LaporanExport() {
       checkPushSubscription();
     }
   }, [user, isAdmin]);
+
+  useEffect(() => {
+    if (!isAdmin || !pushSubscribed || !isNativePushRuntime()) return;
+
+    const checkNativeReminder = async () => {
+      try {
+        const res = await api.get("/notifications/backup-status");
+        if (!res.data?.is_backup_due) return;
+
+        const reminderKey = `${res.data.last_backup_time || "never"}:${res.data.threshold_days || 7}`;
+        if (localStorage.getItem("damkar.native-push-last-reminder") === reminderKey) return;
+
+        const days = res.data.days_since_backup;
+        await sendNativePushNotification(
+          "⚠️ Pengingat Backup Database DAMKAR",
+          days == null
+            ? "Database belum pernah dibackup. Silakan lakukan backup sekarang."
+            : `Sudah ${days} hari sejak backup terakhir.`
+        );
+        localStorage.setItem("damkar.native-push-last-reminder", reminderKey);
+      } catch {
+        // Backup status errors should not interrupt the reports page.
+      }
+    };
+
+    checkNativeReminder();
+    const timer = window.setInterval(checkNativeReminder, 15 * 60 * 1000);
+    return () => window.clearInterval(timer);
+  }, [isAdmin, pushSubscribed]);
 
   const params = () => {
     const p: Record<string, any> = { start, end };
@@ -292,6 +328,14 @@ export default function LaporanExport() {
 
   const testPush = async () => {
     try {
+      if (isNativePushRuntime()) {
+        await sendNativePushNotification(
+          "🔔 Pengingat Backup DAMKAR (Tes)",
+          "Notifikasi desktop DAMKAR berhasil terhubung."
+        );
+        toast.success("Notifikasi desktop berhasil dikirim.");
+        return;
+      }
       const res = await api.post("/notifications/test", {
         title: "🔔 Pengingat Backup DAMKAR (Tes)",
         body: "Web Push berhasil! Notifikasi pengingat database backup Anda telah aktif di browser.",
@@ -551,7 +595,8 @@ export default function LaporanExport() {
                 </div>
 
                 <p className="text-[11px] text-slate-500 leading-relaxed">
-                  Terima notifikasi otomatis langsung di browser jika database belum dibackup lebih dari 7 hari.
+                  Terima notifikasi otomatis jika database belum dibackup lebih dari 7 hari.
+                  {isNativePushRuntime() ? " Pada aplikasi desktop, notifikasi menggunakan sistem notifikasi Tauri." : ""}
                 </p>
 
                 {!pushSupported ? (
