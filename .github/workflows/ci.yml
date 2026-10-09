@@ -169,7 +169,7 @@ jobs:
           packages: "platform-tools"
 
       - name: Install Android SDK packages
-        run: sdkmanager "platforms;android-37" "build-tools;37.0.0" "ndk;29.0.14206865"
+        run: sdkmanager "platforms;android-35" "build-tools;35.0.0" "ndk;29.0.14206865"
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
@@ -201,8 +201,8 @@ jobs:
           ALIGNED_APK="$APK_DIR/damkar-absensi-aligned.apk"
           SIGNED_APK="$APK_DIR/Damkar-Absensi.apk"
 
-          ZIPALIGN="$ANDROID_HOME/build-tools/37.0.0/zipalign"
-          APKSIGNER="$ANDROID_HOME/build-tools/37.0.0/apksigner"
+          ZIPALIGN="$ANDROID_HOME/build-tools/35.0.0/zipalign"
+          APKSIGNER="$ANDROID_HOME/build-tools/35.0.0/apksigner"
 
           "$ZIPALIGN" -p -f 4 "$UNSIGNED_APK" "$ALIGNED_APK"
 
