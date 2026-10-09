@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import api, { apiError } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { ROLE_LABEL } from "@/lib/constants";
@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
-import { UserPlus, Pencil, Power, KeyRound } from "lucide-react";
+import { UserPlus, Pencil, Power, KeyRound, Loader2, ShieldCheck, Search } from "lucide-react";
 import { toast } from "sonner";
 import { motion } from "framer-motion";
 import { ChangePasswordDialog } from "@/components/ChangePasswordDialog";
@@ -21,7 +21,10 @@ export default function UserManagement() {
   const [employees, setEmployees] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [form, setForm] = useState<any>(null);
+  const [initialForm, setInitialForm] = useState<any>(null);
   const [changePwdOpen, setChangePwdOpen] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [userSearch, setUserSearch] = useState("");
 
   const load = async () => {
     setLoading(true);
@@ -42,18 +45,67 @@ export default function UserManagement() {
       .catch(() => {});
   }, []);
 
+  const employeeById = useMemo(
+    () => new Map(employees.map((employee) => [String(employee.id), employee])),
+    [employees]
+  );
+
+  const filteredUsers = useMemo(() => {
+    const query = userSearch.trim().toLowerCase();
+    if (!query) return users;
+    return users.filter((listedUser) => {
+      const employee = employeeById.get(String(listedUser.employee_id));
+      return [listedUser.name, employee?.nama, employee?.nip]
+        .some((value) => value && String(value).toLowerCase().includes(query));
+    });
+  }, [employeeById, userSearch, users]);
+
+  const changed = useMemo(() => {
+    if (!form) return false;
+    if (!form.id) {
+      return Boolean(form.name?.trim() || form.email?.trim() || form.password?.trim() || form.employee_id);
+    }
+    if (!initialForm) return false;
+    return ["name", "email", "password", "role", "status", "employee_id"]
+      .some((field) => (form[field] || "") !== (initialForm[field] || ""));
+  }, [form, initialForm]);
+
+  const openForm = (nextForm: any) => {
+    const normalized = { ...nextForm, password: nextForm.password || "", employee_id: nextForm.employee_id || "" };
+    setForm(normalized);
+    setInitialForm(normalized.id ? { ...normalized } : null);
+  };
+
   const save = async () => {
+    if (!form || !changed || submitting) return;
     try {
-      if (form.id) await api.put(`/users/${form.id}`, form);
-      else await api.post("/users", form);
+      setSubmitting(true);
+
+      if (form.id)
+        await api.put(`/users/${form.id}`, form);
+      else
+        await api.post("/users", form);
+
       toast.success("User tersimpan");
       setForm(null);
+      setInitialForm(null);
       load();
-    } catch (e) { toast.error(apiError(e)); }
+
+      setSubmitting(false);
+    } catch (e) {
+      toast.error(apiError(e));
+    }
   };
+
   const deactivate = async (u) => {
-    try { await api.delete(`/users/${u.id}`); toast.success("User dinonaktifkan"); load(); }
-    catch (e) { toast.error(apiError(e)); }
+    try {
+      await api.delete(`/users/${u.id}`);
+      toast.success("User dinonaktifkan");
+      load();
+    }
+    catch (e) {
+      toast.error(apiError(e));
+    }
   };
 
   const roleBadge = { admin: "bg-red-100 text-red-700", operator: "bg-blue-100 text-blue-700", viewer: "bg-slate-200 text-slate-600" };
@@ -70,7 +122,7 @@ export default function UserManagement() {
           )}
         </div>
         <div className="flex items-center gap-2">
-          <Button onClick={() => setForm({ name: "", email: "", password: "", role: "operator", status: "ACTIVE", employee_id: "" })} className="gap-2 bg-red-600 hover:bg-red-700" data-testid="add-user-btn">
+          <Button onClick={() => openForm({ name: "", email: "", password: "", role: "operator", status: "ACTIVE", employee_id: "" })} className="gap-2 bg-red-600 hover:bg-red-700" data-testid="add-user-btn">
             <UserPlus className="h-4 w-4" /> Tambah User
           </Button>
         </div>
@@ -82,6 +134,18 @@ export default function UserManagement() {
         transition={{ duration: 0.5, ease: "easeOut" }}
       >
         <Card className="overflow-hidden border-slate-200">
+          <div className="border-b border-slate-200 bg-white p-4">
+            <div className="relative max-w-md">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+              <Input
+                value={userSearch}
+                onChange={(event) => setUserSearch(event.target.value)}
+                placeholder="Cari nama atau NIP..."
+                className="pl-9"
+                data-testid="user-search"
+              />
+            </div>
+          </div>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
@@ -109,27 +173,33 @@ export default function UserManagement() {
                       </td>
                     </tr>
                   ))
-                ) : users.length === 0 ? (
+                ) : filteredUsers.length === 0 ? (
                   <tr>
                     <td colSpan={5} className="py-12 text-center text-slate-400">
-                      Belum ada user terdaftar.
+                      {userSearch ? `Tidak ada user yang cocok dengan "${userSearch}".` : "Belum ada user terdaftar."}
                     </td>
                   </tr>
                 ) : (
-                  users.map((u) => (
+                  filteredUsers.map((u) => {
+                    const employee = employeeById.get(String(u.employee_id));
+                    return (
                     <tr key={u.id} className="border-b border-slate-100 hover:bg-slate-50 transition-colors" data-testid={`user-row-${u.id}`}>
-                      <td className="px-4 py-3 font-semibold text-slate-800">{u.name}</td>
+                      <td className="px-4 py-3 font-semibold text-slate-800">
+                        <p>{u.name}</p>
+                        {employee?.nip && <p className="font-mono text-xs font-normal text-slate-400">NIP {employee.nip}</p>}
+                      </td>
                       <td className="px-4 py-3 text-slate-500">{u.email}</td>
                       <td className="px-4 py-3"><Badge className={`${roleBadge[u.role]} hover:${roleBadge[u.role]}`}>{ROLE_LABEL[u.role]}</Badge></td>
                       <td className="px-4 py-3"><Badge className={u.status === "ACTIVE" ? "bg-emerald-100 text-emerald-700" : "bg-slate-200 text-slate-600"}>{u.status === "ACTIVE" ? "Aktif" : "Nonaktif"}</Badge></td>
                       <td className="px-4 py-3">
                         <div className="flex justify-end gap-1">
-                          <Button size="icon" variant="ghost" onClick={() => setForm({ ...u, password: "", employee_id: u.employee_id || "" })} data-testid={`edit-user-${u.id}`}><Pencil className="h-4 w-4 text-slate-500" /></Button>
+                          <Button size="icon" variant="ghost" onClick={() => openForm(u)} data-testid={`edit-user-${u.id}`}><Pencil className="h-4 w-4 text-slate-500" /></Button>
                           {Boolean(user && u.id !== user.id) && <Button size="icon" variant="ghost" onClick={() => deactivate(u)} data-testid={`deactivate-user-${u.id}`}><Power className="h-4 w-4 text-rose-500" /></Button>}
                         </div>
                       </td>
                     </tr>
-                  ))
+                    );
+                  })
                 )}
               </tbody>
             </table>
@@ -137,7 +207,7 @@ export default function UserManagement() {
         </Card>
       </motion.div>
 
-      <Dialog open={!!form} onOpenChange={(o) => !o && setForm(null)}>
+      <Dialog open={!!form} onOpenChange={(o) => { if (!o) { setForm(null); setInitialForm(null); } }}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>{form?.id ? "Edit User" : "Tambah User"}</DialogTitle>
@@ -177,7 +247,12 @@ export default function UserManagement() {
                 </div>
               </div>
               <div className="space-y-1.5">
-                <Label>Tautkan ke Pegawai <span className="text-xs text-slate-400">(wajib untuk role Staff/Kasubid/Komandan agar bisa lihat "Absensi Saya")</span></Label>
+                <div className="flex flex-col gap-1.5">
+                  <Label>Tautkan ke Pegawai</Label>
+                  <Label className="text-xs text-red-400">
+                    wajib untuk role Staff/Kasubid/Komandan agar bisa lihat "Absensi Saya"
+                  </Label>
+                </div>
                 <Select value={form.employee_id || "none"} onValueChange={(v) => setForm({ ...form, employee_id: v === "none" ? "" : v })}>
                   <SelectTrigger data-testid="user-employee"><SelectValue placeholder="Tidak ditautkan" /></SelectTrigger>
                   <SelectContent className="max-h-64">
@@ -189,8 +264,24 @@ export default function UserManagement() {
             </div>
           )}
           <DialogFooter>
-            <Button variant="outline" onClick={() => setForm(null)}>Batal</Button>
-            <Button onClick={save} className="bg-red-600 hover:bg-red-700" data-testid="save-user-btn">Simpan</Button>
+            <Button variant="outline" onClick={() => { setForm(null); setInitialForm(null); }}>Batal</Button>
+            <Button
+              disabled={submitting || !changed}
+              type="submit"
+              onClick={save}
+              className="bg-red-600 hover:bg-red-700" data-testid="save-user-btn">
+              {submitting ? (
+                <>
+                  <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
+                  Menyimpan...
+                </>
+              ) : (
+                <>
+                  <ShieldCheck className="mr-1.5 h-4 w-4" />
+                  Simpan
+                </>
+              )}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
