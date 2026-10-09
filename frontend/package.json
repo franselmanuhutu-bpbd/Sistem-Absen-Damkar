@@ -13,7 +13,9 @@
     "tauri:build": "bun run scripts/build-signed.ts",
     "tauri:build:signed": "bun run scripts/build-signed.ts",
     "tauri:build:nosign": "tauri build --no-sign",
-    "tauri:build:raw": "tauri build"
+    "tauri:build:raw": "tauri build",
+    "tauri:android:dev": "tauri android dev",
+    "tauri:android:build": "bun run scripts/sync-android-icons.ts && tauri android build --apk"
   },
   "dependencies": {
     "@hookform/resolvers": "5.0.1",

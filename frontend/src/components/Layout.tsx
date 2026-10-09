@@ -91,6 +91,10 @@ export function Layout({ children }: { children: ReactNode }) {
   });
 
   const loc = useLocation();
+  const isAndroidTauri =
+    isTauriEnvironment() &&
+    typeof navigator !== "undefined" &&
+    /android/i.test(navigator.userAgent);
   const userRole = user && typeof user === "object" && user.role ? user.role : "";
   const links = NAV.filter((n, index) => {
     if (n.type === "route") {
@@ -396,10 +400,12 @@ export function Layout({ children }: { children: ReactNode }) {
               animate={{ x: 0 }}
               exit={{ x: "-100%" }}
               transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
-              className="absolute inset-y-0 left-0 w-72 max-w-[85vw] h-full shadow-2xl flex flex-col bg-[#0F172A] text-slate-300 z-50 border-r border-white/10"
+              className={`absolute inset-y-0 left-0 w-72 max-w-[85vw] h-full shadow-2xl flex flex-col bg-[#0F172A] text-slate-300 z-50 border-r border-white/10 ${
+                isAndroidTauri ? "android-safe-area-drawer" : ""
+              }`}
             >
               {/* Mobile Drawer Header */}
-              <div className="flex items-center justify-between px-5 py-4 border-b border-white/10">
+              <div className="flex items-center justify-between px-5 py-4 border-b border-white/10 android-safe-area-drawer-header">
                 <div className="flex items-center gap-3 min-w-0">
                   <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-red-600 shadow-lg shadow-red-900/40">
                     <Flame className="h-5 w-5 text-white" />
@@ -507,7 +513,11 @@ export function Layout({ children }: { children: ReactNode }) {
           collapsed ? "lg:pl-[76px]" : "lg:pl-70"
         }`}
       >
-        <header className="sticky top-0 z-20 flex h-16 items-center gap-3 border-b border-slate-200 bg-white/90 px-4 backdrop-blur lg:px-8">
+        <header
+          className={`sticky top-0 z-20 flex items-center gap-3 border-b border-slate-200 bg-white/90 px-4 backdrop-blur lg:h-16 lg:px-8 ${
+            isAndroidTauri ? "android-safe-area-header" : "h-16"
+          }`}
+        >
           {/* Mobile hamburger menu toggle */}
           <motion.button
             whileTap={{ scale: 0.9 }}

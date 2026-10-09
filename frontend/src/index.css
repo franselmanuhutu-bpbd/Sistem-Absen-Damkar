@@ -60,3 +60,18 @@ body {
   to { opacity: 1; transform: translateY(0); }
 }
 .animate-fade-up { animation: fade-up 0.4s ease both; }
+
+@media (max-width: 1023px) {
+  .android-safe-area-header {
+    min-height: calc(4rem + max(env(safe-area-inset-top), 24px));
+    padding-top: max(env(safe-area-inset-top), 24px);
+  }
+
+  .android-safe-area-drawer {
+    padding-top: max(env(safe-area-inset-top), 24px);
+  }
+
+  .android-safe-area-drawer-header {
+    padding-top: 1rem;
+  }
+}
