@@ -119,7 +119,7 @@ export default function Kalender() {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 className="font-heading text-2xl font-bold text-slate-900">Kalender Absensi</h2>
-          <p className="text-sm text-slate-500">Ringkasan harian — klik tanggal untuk detail.</p>
+          <p className="text-sm text-slate-500">Ringkasan harian | klik tanggal untuk detail.</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <MonthPicker value={month} onChange={setMonth} data-testid="calendar-month" />
