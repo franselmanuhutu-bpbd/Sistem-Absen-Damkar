@@ -33,6 +33,7 @@ import {
   sendNativePushNotification,
 } from "@/lib/push";
 import JSZip from "jszip";
+import { saveFileForRuntime } from "@/lib/file-save";
 
 function addMonths(ym: string, n: number) {
   let [y, m] = ym.split("-").map(Number);
@@ -142,12 +143,12 @@ export default function LaporanExport() {
   const exportExcel = async () => {
     setExp("excel");
     try {
-      await downloadFile(
+      const saved = await downloadFile(
         "/export/excel",
         { ...params(), include_breakdown: sections.breakdown, include_detail: sections.detail },
         `Rekap_${start}_${end}.xlsx`
       );
-      toast.success("Excel berhasil diunduh");
+      if (saved) toast.success("Excel berhasil diunduh");
     } catch (e) {
       toast.error(apiError(e));
     }
@@ -157,12 +158,12 @@ export default function LaporanExport() {
   const exportPdf = async () => {
     setExp("pdf");
     try {
-      await downloadFile(
+      const saved = await downloadFile(
         "/export/pdf",
         { ...params(), include_summary: sections.summary, include_breakdown: sections.breakdown, include_detail: sections.detail },
         `Rekap_${start}_${end}.pdf`
       );
-      toast.success("PDF berhasil diunduh");
+      if (saved) toast.success("PDF berhasil diunduh");
     } catch (e) {
       toast.error(apiError(e));
     }
@@ -246,14 +247,11 @@ export default function LaporanExport() {
       const timePart = now.toTimeString().slice(0, 8).replace(/:/g, "");
       const filename = `backup_damkar_${datePart}_${timePart}.zip`;
 
-      const downloadUrl = URL.createObjectURL(zipBlob);
-      const link = document.createElement("a");
-      link.href = downloadUrl;
-      link.download = filename;
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      URL.revokeObjectURL(downloadUrl);
+      const saved = await saveFileForRuntime(zipBlob, filename);
+      if (!saved) {
+        toast.info("Penyimpanan backup dibatalkan.", { id: toastId });
+        return;
+      }
 
       // 5. Catat log audit ke backend agar riwayat & pengingat backup terupdate
       try {

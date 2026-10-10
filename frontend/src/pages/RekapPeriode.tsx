@@ -91,12 +91,13 @@ export default function RekapPeriode() {
     try {
       if (type === "excel") {
         params.include_breakdown = true; params.include_detail = false;
-        await downloadFile("/export/excel", params, `Rekap_Periode_${start}_${end}.xlsx`);
+        const saved = await downloadFile("/export/excel", params, `Rekap_Periode_${start}_${end}.xlsx`);
+        if (saved) toast.success("Laporan berhasil diunduh");
       } else {
         params.include_summary = true; params.include_breakdown = true;
-        await downloadFile("/export/pdf", params, `Rekap_Periode_${start}_${end}.pdf`);
+        const saved = await downloadFile("/export/pdf", params, `Rekap_Periode_${start}_${end}.pdf`);
+        if (saved) toast.success("Laporan berhasil diunduh");
       }
-      toast.success("Laporan berhasil diunduh");
     } catch (e) { toast.error(apiError(e)); }
     setExp("");
   };

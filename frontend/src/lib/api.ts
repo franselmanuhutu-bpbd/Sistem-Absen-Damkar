@@ -1,4 +1,5 @@
 import axios, { type AxiosInstance, type InternalAxiosRequestConfig, type AxiosResponse } from "axios";
+import { saveFileForRuntime } from "./file-save";
 
 export const DEFAULT_DEV_API_URL = "http://localhost:8000/api";
 export const DEFAULT_VERCEL_API_URL = "https://sistem-absen-damkar.vercel.app/api";
@@ -237,23 +238,13 @@ export async function downloadFile(
   url: string,
   params: Record<string, any> | undefined,
   filename: string
-): Promise<void> {
+): Promise<boolean> {
   const response = await api.get(url, {
     params,
     responseType: "blob",
   });
 
-  const blob = new Blob([response.data]);
-  const link = document.createElement("a");
-
-  link.href = URL.createObjectURL(blob);
-  link.download = filename;
-
-  document.body.appendChild(link);
-  link.click();
-  link.remove();
-
-  URL.revokeObjectURL(link.href);
+  return saveFileForRuntime(new Blob([response.data]), filename);
 }
 
 export function apiError(error: any): string {

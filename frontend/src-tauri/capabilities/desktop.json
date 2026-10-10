@@ -11,6 +11,10 @@
   "permissions": [
     "updater:default",
     "notification:default",
+    "dialog:default",
+    "fs:default",
+    "fs:allow-write-file",
+    "fs:allow-mkdir",
     "opener:default",
     "process:default",
     "core:app:default"

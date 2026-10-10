@@ -46,8 +46,8 @@ export default function RekapKasubid() {
   const doExport = async (type) => {
     setExp(type);
     try {
-      await downloadFile(`/export/kasubid/${type}`, { start, end }, `Rekap_Kasubid_${start}_${end}.${type === "excel" ? "xlsx" : "pdf"}`);
-      toast.success("Laporan Kasubid diunduh");
+      const saved = await downloadFile(`/export/kasubid/${type}`, { start, end }, `Rekap_Kasubid_${start}_${end}.${type === "excel" ? "xlsx" : "pdf"}`);
+      if (saved) toast.success("Laporan Kasubid diunduh");
     } catch (e) { toast.error(apiError(e)); }
     setExp("");
   };
