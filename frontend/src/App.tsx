@@ -58,15 +58,12 @@ function InitialPushPermission() {
 
 function ResponsiveToaster() {
   const getPosition = () => {
-    const isMobileTauri =
-      isTauriEnvironment() &&
-      typeof navigator !== "undefined" &&
-      /android|iphone|ipad|ipod/i.test(navigator.userAgent);
-    const isMobileViewport =
-      typeof window !== "undefined" &&
-      window.matchMedia("(max-width: 640px)").matches;
+    const isMobileTauri = isTauriEnvironment() && typeof navigator !== "undefined" && /android|iphone|ipad|ipod/i.test(navigator.userAgent);
+    const isMobileViewport = typeof window !== "undefined" && window.matchMedia("(max-width: 640px)").matches;
+
     return isMobileTauri || isMobileViewport ? "top-right" : "bottom-right";
   };
+
   const [position, setPosition] = useState<"top-right" | "bottom-right">(getPosition);
 
   useEffect(() => {
@@ -76,7 +73,17 @@ function ResponsiveToaster() {
     return () => mediaQuery.removeEventListener("change", handleChange);
   }, []);
 
-  return <Toaster position={position} richColors />;
+  return (
+    <Toaster
+      position={position}
+      richColors
+      mobileOffset={{
+        top: "calc(env(safe-area-inset-top) + 12px)",
+        right: 16,
+        left: 16,
+      }}
+    />
+  );
 }
 
 export function App() {
