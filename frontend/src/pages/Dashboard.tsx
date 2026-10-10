@@ -339,68 +339,6 @@ export default function Dashboard() {
       )}
 
       <div className="grid grid-cols-1 items-stretch gap-6 lg:grid-cols-3">
-        {/* Statistics */}
-        <Card className="flex h-full flex-col border-slate-200 p-5 lg:col-span-2">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-4">
-          <div>
-            <h3 className="font-heading text-base font-bold text-slate-800">Statistik per Regu</h3>
-          </div>
-        </div>
-
-        {showSkeleton ? (
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {[1, 2, 3, 4, 5, 6].map((i) => (
-              <Card key={i} className="border-slate-200 p-5">
-                <div className="flex items-center gap-3">
-                  <Skeleton className="h-9 w-9 rounded-lg" />
-                  <div className="space-y-1.5 flex-1">
-                    <Skeleton className="h-4 w-32" />
-                    <Skeleton className="h-3 w-44" />
-                  </div>
-                </div>
-                <div className="mt-4 grid grid-cols-3 gap-2">
-                  {[1, 2, 3, 4, 5, 6].map((j) => (
-                    <Skeleton key={j} className="h-12 rounded-lg" />
-                  ))}
-                </div>
-              </Card>
-            ))}
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 items-stretch gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {(data?.per_team || []).map((t) => (
-              <Card key={t.team.id} data-testid={`team-card-${t.team.code}`} className="flex h-full flex-col border-slate-200 p-5 transition-all hover:shadow-sm">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-red-50 text-red-600">
-                      <Flame className="h-5 w-5" />
-                    </div>
-                    <div>
-                      <p className="font-heading font-bold text-slate-900">{t.team.name}</p>
-                      <p className="text-xs text-slate-500">
-                        {t.members} anggota · ⭐ {t.commander_name || "—"}
-                      </p>
-                      {t.current_commander_name && t.current_commander_name !== t.commander_name && (
-                        <p className="text-[11px] text-slate-400 mt-0.5">
-                          Saat ini: ⭐ {t.current_commander_name}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                </div>
-                <div className="mt-4 grid flex-1 grid-cols-3 items-stretch gap-2">
-                  {STATUSES.map((s) => (
-                    <div key={s} className={`flex flex-col items-center justify-center rounded-lg border p-2 text-center transition-transform ${STATUS_CONFIG[s].badge}`}>
-                      <p className="text-lg font-extrabold leading-none">{t[s] ?? 0}</p>
-                      <p className="text-[10px] font-semibold mt-1">{s}</p>
-                    </div>
-                  ))}
-                </div>
-              </Card>
-            ))}
-          </div>
-        )}
-        </Card>
 
         {/* Monthly leaderboard */}
         <Card className="flex h-full flex-col border-slate-200 p-5">
@@ -431,15 +369,14 @@ export default function Dashboard() {
                   data-testid={`monthly-leaderboard-${item.team.code}`}
                   className="flex min-h-12 flex-1 items-center gap-3 rounded-lg border border-slate-200 bg-slate-50/60 px-3 py-2.5"
                 >
-                  <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-extrabold ${
-                    index === 0
+                  <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-extrabold ${index === 0
                       ? "bg-amber-100 text-amber-700"
                       : index === 1
                         ? "bg-slate-200 text-slate-700"
                         : index === 2
                           ? "bg-orange-100 text-orange-700"
                           : "bg-white text-slate-500"
-                  }`}>
+                    }`}>
                     {index + 1}
                   </span>
                   <div className="min-w-0 flex-1">
@@ -450,6 +387,69 @@ export default function Dashboard() {
                     {item.hadir} <span className="text-xs font-semibold text-slate-500">Hadir</span>
                   </p>
                 </div>
+              ))}
+            </div>
+          )}
+        </Card>
+
+        {/* Statistics */}
+        <Card className="flex h-full flex-col border-slate-200 p-5 lg:col-span-2">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-4">
+            <div>
+              <h3 className="font-heading text-base font-bold text-slate-800">Statistik per Regu</h3>
+            </div>
+          </div>
+
+          {showSkeleton ? (
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {[1, 2, 3, 4, 5, 6].map((i) => (
+                <Card key={i} className="border-slate-200 p-5">
+                  <div className="flex items-center gap-3">
+                    <Skeleton className="h-9 w-9 rounded-lg" />
+                    <div className="space-y-1.5 flex-1">
+                      <Skeleton className="h-4 w-32" />
+                      <Skeleton className="h-3 w-44" />
+                    </div>
+                  </div>
+                  <div className="mt-4 grid grid-cols-3 gap-2">
+                    {[1, 2, 3, 4, 5, 6].map((j) => (
+                      <Skeleton key={j} className="h-12 rounded-lg" />
+                    ))}
+                  </div>
+                </Card>
+              ))}
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 items-stretch gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {(data?.per_team || []).map((t) => (
+                <Card key={t.team.id} data-testid={`team-card-${t.team.code}`} className="flex h-full flex-col border-slate-200 p-5 transition-all hover:shadow-sm">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-red-50 text-red-600">
+                        <Flame className="h-5 w-5" />
+                      </div>
+                      <div>
+                        <p className="font-heading font-bold text-slate-900">{t.team.name}</p>
+                        <p className="text-xs text-slate-500">
+                          {t.members} anggota · ⭐ {t.commander_name || "—"}
+                        </p>
+                        {t.current_commander_name && t.current_commander_name !== t.commander_name && (
+                          <p className="text-[11px] text-slate-400 mt-0.5">
+                            Saat ini: ⭐ {t.current_commander_name}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="mt-4 grid flex-1 grid-cols-3 items-stretch gap-2">
+                    {STATUSES.map((s) => (
+                      <div key={s} className={`flex flex-col items-center justify-center rounded-lg border p-2 text-center transition-transform ${STATUS_CONFIG[s].badge}`}>
+                        <p className="text-lg font-extrabold leading-none">{t[s] ?? 0}</p>
+                        <p className="text-[10px] font-semibold mt-1">{s}</p>
+                      </div>
+                    ))}
+                  </div>
+                </Card>
               ))}
             </div>
           )}
