@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import api, { apiError } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import {
@@ -16,6 +16,14 @@ import { Badge } from "@/components/ui/badge";
 import { KeyRound, Eye, EyeOff, Loader2, ShieldCheck, Settings, User as UserIcon } from "lucide-react";
 import { toast } from "sonner";
 import { ROLE_LABEL } from "@/lib/constants";
+import {
+  getExistingSubscription,
+  isNativePushEnabled,
+  isNativePushRuntime,
+  isPushSupported,
+  subscribeToPush,
+  unsubscribeFromPush,
+} from "@/lib/push";
 
 interface ChangePasswordDialogProps {
   open: boolean;
@@ -31,6 +39,45 @@ export function ChangePasswordDialog({ open, onOpenChange }: ChangePasswordDialo
   const [showNew, setShowNew] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [pushSubscribed, setPushSubscribed] = useState(false);
+  const [pushSupported, setPushSupported] = useState(true);
+  const [pushLoading, setPushLoading] = useState(false);
+
+  useEffect(() => {
+    if (!open) return;
+    let active = true;
+    const checkPush = async () => {
+      const supported = isPushSupported();
+      if (!active) return;
+      setPushSupported(supported);
+      if (!supported) return;
+      const subscribed = isNativePushRuntime()
+        ? isNativePushEnabled()
+        : Boolean(await getExistingSubscription());
+      if (active) setPushSubscribed(subscribed);
+    };
+    checkPush();
+    return () => {
+      active = false;
+    };
+  }, [open]);
+
+  const togglePush = async () => {
+    setPushLoading(true);
+    try {
+      const result = pushSubscribed
+        ? await unsubscribeFromPush()
+        : await subscribeToPush();
+      if (!result.success) {
+        toast.error(result.error || "Gagal mengubah pengaturan notifikasi.");
+        return;
+      }
+      setPushSubscribed(!pushSubscribed);
+      toast.success(pushSubscribed ? "Notifikasi dinonaktifkan." : "Notifikasi diaktifkan.");
+    } finally {
+      setPushLoading(false);
+    }
+  };
 
   const resetForm = () => {
     setCurrentPassword("");
@@ -94,7 +141,7 @@ export function ChangePasswordDialog({ open, onOpenChange }: ChangePasswordDialo
             </div>
             <div>
               <DialogTitle>Pengaturan Pengguna</DialogTitle>
-              <DialogDescription className="text-xs text-slate-500">
+              <DialogDescription className="text-xs text-slate-500 mt-1">
                 Informasi profil akun dan keamanan password.
               </DialogDescription>
             </div>
@@ -123,6 +170,30 @@ export function ChangePasswordDialog({ open, onOpenChange }: ChangePasswordDialo
           <div className="flex items-center gap-1.5 pt-1 text-xs font-semibold text-slate-700 uppercase tracking-wider">
             <KeyRound className="h-3.5 w-3.5 text-amber-500" />
             <span>Ubah Password</span>
+          </div>
+          <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <Label className="text-sm">Notifikasi Push</Label>
+                <p className="mt-0.5 text-xs text-slate-500">
+                  {pushSupported
+                    ? pushSubscribed
+                      ? "Notifikasi aktif di perangkat ini."
+                      : "Aktifkan untuk menerima pengingat."
+                    : "Perangkat ini tidak mendukung notifikasi push."}
+                </p>
+              </div>
+              <Button
+                type="button"
+                size="sm"
+                variant={pushSubscribed ? "outline" : "default"}
+                disabled={!pushSupported || pushLoading}
+                onClick={togglePush}
+                className={!pushSubscribed ? "bg-amber-600 text-white hover:bg-amber-700" : ""}
+              >
+                {pushLoading ? "Memproses..." : pushSubscribed ? "Nonaktifkan" : "Aktifkan"}
+              </Button>
+            </div>
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="current-pwd">Password Lama</Label>

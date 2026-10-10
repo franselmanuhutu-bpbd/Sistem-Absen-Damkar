@@ -86,7 +86,9 @@ export default function LaporanExport() {
   const checkPushSubscription = async () => {
     const supported = isPushSupported();
     setPushSupported(supported);
-    if (!supported) return;
+    if (!supported) {
+      return;
+    }
 
     if (isNativePushRuntime()) {
       setPushSubscribed(isNativePushEnabled());
@@ -329,9 +331,9 @@ export default function LaporanExport() {
       if (isNativePushRuntime()) {
         await sendNativePushNotification(
           "🔔 Pengingat Backup DAMKAR (Tes)",
-          "Notifikasi desktop DAMKAR berhasil terhubung."
+          "Notifikasi DAMKAR berhasil terhubung."
         );
-        toast.success("Notifikasi desktop berhasil dikirim.");
+        toast.success("Notifikasi berhasil dikirim.");
         return;
       }
       const res = await api.post("/notifications/test", {

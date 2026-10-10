@@ -60,6 +60,8 @@ interface DashboardResponse {
 interface MonthlyLeaderboardItem {
   team: TeamData;
   hadir: number;
+  members: number;
+  score: number;
 }
 
 function getTodayLocal(): string {
@@ -346,7 +348,7 @@ export default function Dashboard() {
             <div>
               <h3 className="font-heading text-base font-bold text-slate-800">Leaderboard Regu Bulan ini</h3>
               <p className="text-xs text-slate-500">
-                Peringkat regu berdasarkan jumlah Hadir · {monthLabel(data?.monthly_period)}
+                Peringkat berdasarkan rasio Hadir / anggota · {monthLabel(data?.monthly_period)}
               </p>
             </div>
             <Flame className="h-5 w-5 shrink-0 text-amber-500" />
@@ -381,10 +383,13 @@ export default function Dashboard() {
                   </span>
                   <div className="min-w-0 flex-1">
                     <p className="truncate font-semibold text-slate-800">{item.team.name}</p>
-                    <p className="text-xs text-slate-500">Total kehadiran bulan ini</p>
+                    <p className="text-xs text-slate-500">
+                      {item.hadir} Hadir / {item.members} anggota
+                    </p>
                   </div>
                   <p className="shrink-0 text-lg font-extrabold text-emerald-600">
-                    {item.hadir} <span className="text-xs font-semibold text-slate-500">Hadir</span>
+                    {(item.score * 100).toFixed(1)}%
+                    <span className="text-xs font-semibold text-slate-500"> Skor</span>
                   </p>
                 </div>
               ))}

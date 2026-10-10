@@ -67,7 +67,7 @@ async def dashboard(date: str = None, user: dict = Depends(get_current_user)):
     next_month = (month_start.replace(day=28) + timedelta(days=4)).replace(day=1)
     month_records = (
         await db.table("attendance")
-        .select("employee_id, team_id, status")
+        .select("employee_id, team_id, status, date")
         .gte("date", month_start.isoformat())
         .lt("date", next_month.isoformat())
         .limit(10000)
@@ -111,21 +111,56 @@ async def dashboard(date: str = None, user: dict = Depends(get_current_user)):
             per_team[team_id][status] += 1
 
     monthly_hadir = {t["id"]: 0 for t in teams}
+    monthly_hadir_seen = set()
+    monthly_team_days = {t["id"]: set() for t in teams}
+    monthly_member_ids = {t["id"]: set() for t in teams}
     for record in month_records:
+        team_id = record.get("team_id")
+        if team_id in monthly_team_days and record.get("date"):
+            monthly_team_days[team_id].add(record["date"])
+        if (
+            record.get("employee_id") in active_ids
+            and team_id in monthly_member_ids
+        ):
+            monthly_member_ids[team_id].add(record["employee_id"])
         if (
             record.get("employee_id") in active_ids
             and str(record.get("status") or "").strip().upper() == "HDR"
-            and record.get("team_id") in monthly_hadir
+            and team_id in monthly_hadir
         ):
-            monthly_hadir[record["team_id"]] += 1
+            attendance_key = (
+                record.get("employee_id"),
+                record.get("date"),
+                team_id,
+            )
+            if attendance_key not in monthly_hadir_seen:
+                monthly_hadir_seen.add(attendance_key)
+                monthly_hadir[team_id] += 1
+    monthly_members = {
+        team_id: per_team[team_id]["members"]
+        for team_id in per_team
+    }
     monthly_leaderboard = [
         {
             "team": t,
             "hadir": monthly_hadir[t["id"]],
+            "members": monthly_members[t["id"]],
+            "score": (
+                monthly_hadir[t["id"]]
+                / (
+                    max(
+                        monthly_members[t["id"]],
+                        len(monthly_member_ids[t["id"]]),
+                    )
+                    * max(len(monthly_team_days[t["id"]]), 1)
+                )
+                if max(monthly_members[t["id"]], len(monthly_member_ids[t["id"]])) > 0
+                else 0
+            ),
         }
         for t in teams
     ]
-    monthly_leaderboard.sort(key=lambda item: (-item["hadir"], item["team"].get("order", 0)))
+    monthly_leaderboard.sort(key=lambda item: (-item["score"], item["team"].get("order", 0)))
 
     # Parallel resolution of kasubid and commanders
     kasubid_keys = [("KASUBID1", "Kasubid 1"), ("KASUBID2", "Kasubid 2")]

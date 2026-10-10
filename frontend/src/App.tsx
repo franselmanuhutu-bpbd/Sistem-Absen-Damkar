@@ -22,6 +22,9 @@ import UserManagement from "@/pages/UserManagement";
 import AuditLog from "@/pages/AuditLog";
 
 import { NavigationGuardProvider } from "@/context/NavigationGuardContext";
+import { isTauriEnvironment } from "@/lib/api";
+import { requestInitialPushPermission } from "@/lib/push";
+import { useEffect, useState } from "react";
 
 interface ProtectedProps {
   children: ReactNode;
@@ -41,9 +44,45 @@ function Protected({ children, roles }: ProtectedProps) {
   return <Layout>{children}</Layout>;
 }
 
+function InitialPushPermission() {
+  const { user, loading } = useAuth();
+
+  useEffect(() => {
+    if (!loading && user) {
+      requestInitialPushPermission();
+    }
+  }, [loading, user]);
+
+  return null;
+}
+
+function ResponsiveToaster() {
+  const getPosition = () => {
+    const isMobileTauri =
+      isTauriEnvironment() &&
+      typeof navigator !== "undefined" &&
+      /android|iphone|ipad|ipod/i.test(navigator.userAgent);
+    const isMobileViewport =
+      typeof window !== "undefined" &&
+      window.matchMedia("(max-width: 640px)").matches;
+    return isMobileTauri || isMobileViewport ? "top-right" : "bottom-right";
+  };
+  const [position, setPosition] = useState<"top-right" | "bottom-right">(getPosition);
+
+  useEffect(() => {
+    const mediaQuery = window.matchMedia("(max-width: 640px)");
+    const handleChange = () => setPosition(getPosition());
+    mediaQuery.addEventListener("change", handleChange);
+    return () => mediaQuery.removeEventListener("change", handleChange);
+  }, []);
+
+  return <Toaster position={position} richColors />;
+}
+
 export function App() {
   return (
     <AuthProvider>
+      <InitialPushPermission />
       <UpdateProvider>
         <BrowserRouter>
           <NavigationGuardProvider>
@@ -68,7 +107,7 @@ export function App() {
             </Routes>
           </NavigationGuardProvider>
         </BrowserRouter>
-        <Toaster position="bottom-right" richColors />
+        <ResponsiveToaster />
       </UpdateProvider>
     </AuthProvider>
   );

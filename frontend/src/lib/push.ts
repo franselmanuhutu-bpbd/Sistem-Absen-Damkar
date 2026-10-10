@@ -7,6 +7,25 @@ import {
 } from "@tauri-apps/plugin-notification";
 
 const NATIVE_PUSH_ENABLED_KEY = "damkar.native-push-enabled";
+const INITIAL_PUSH_PERMISSION_KEY = "damkar.initial-push-permission-requested";
+
+export async function requestInitialPushPermission(): Promise<void> {
+  if (typeof window === "undefined" || localStorage.getItem(INITIAL_PUSH_PERMISSION_KEY)) {
+    return;
+  }
+  if (!isPushSupported()) {
+    localStorage.setItem(INITIAL_PUSH_PERMISSION_KEY, "true");
+    return;
+  }
+
+  try {
+    await subscribeToPush();
+  } catch (err) {
+    console.warn("Initial notification permission request failed:", err);
+  } finally {
+    localStorage.setItem(INITIAL_PUSH_PERMISSION_KEY, "true");
+  }
+}
 
 export function isNativePushRuntime(): boolean {
   return isTauri();
@@ -23,13 +42,13 @@ export async function subscribeToNativePush(): Promise<{ success: boolean; error
       permissionGranted = (await requestPermission()) === "granted";
     }
     if (!permissionGranted) {
-      return { success: false, error: "Izin notifikasi desktop tidak diberikan." };
+      return { success: false, error: "Izin notifikasi tidak diberikan." };
     }
     localStorage.setItem(NATIVE_PUSH_ENABLED_KEY, "true");
     return { success: true };
   } catch (err: any) {
     console.error("Failed to enable native notifications:", err);
-    return { success: false, error: err?.message || "Gagal mengaktifkan notifikasi desktop." };
+    return { success: false, error: err?.message || "Gagal mengaktifkan notifikasi." };
   }
 }
 
