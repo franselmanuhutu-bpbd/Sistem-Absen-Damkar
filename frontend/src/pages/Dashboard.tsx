@@ -338,89 +338,72 @@ export default function Dashboard() {
         </div>
       )}
 
-      <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-3">
-        {/* Chart */}
-        <Card className="border-slate-200 p-5 lg:col-span-2">
+      <div className="grid grid-cols-1 items-stretch gap-6 lg:grid-cols-3">
+        {/* Statistics */}
+        <Card className="flex h-full flex-col border-slate-200 p-5 lg:col-span-2">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-4">
           <div>
-            <h3 className="font-heading text-base font-bold text-slate-800">Grafik Kehadiran per Regu</h3>
-            <p className="text-xs text-slate-500">Komposisi status kehadiran regu operasional</p>
-          </div>
-          {/* Legend */}
-          <div className="flex flex-wrap items-center gap-3">
-            {STATUSES.map((s) => (
-              <div key={s} className="flex items-center gap-1.5 text-xs text-slate-600">
-                <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: STATUS_CONFIG[s].hex }} />
-                <span className="font-medium">{s}</span>
-              </div>
-            ))}
+            <h3 className="font-heading text-base font-bold text-slate-800">Statistik per Regu</h3>
           </div>
         </div>
 
         {showSkeleton ? (
-          <div className="h-72 w-full flex items-end gap-6 pt-6 pb-2 px-6">
-            {[55, 80, 45, 90, 65, 75].map((h, i) => (
-              <div key={i} className="flex-1 flex flex-col items-center gap-2 h-full justify-end">
-                <Skeleton className="w-full rounded-t-md" style={{ height: `${h}%` }} />
-                <Skeleton className="h-3 w-8" />
-              </div>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {[1, 2, 3, 4, 5, 6].map((i) => (
+              <Card key={i} className="border-slate-200 p-5">
+                <div className="flex items-center gap-3">
+                  <Skeleton className="h-9 w-9 rounded-lg" />
+                  <div className="space-y-1.5 flex-1">
+                    <Skeleton className="h-4 w-32" />
+                    <Skeleton className="h-3 w-44" />
+                  </div>
+                </div>
+                <div className="mt-4 grid grid-cols-3 gap-2">
+                  {[1, 2, 3, 4, 5, 6].map((j) => (
+                    <Skeleton key={j} className="h-12 rounded-lg" />
+                  ))}
+                </div>
+              </Card>
             ))}
           </div>
-        ) : totalRecorded === 0 ? (
-          <div className="h-72 w-full flex flex-col items-center justify-center text-center p-6 rounded-lg border border-dashed border-slate-200 bg-slate-50/50">
-            <div className="h-12 w-12 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 mb-3">
-              <BarChart3 className="h-6 w-6" />
-            </div>
-            <p className="text-sm font-semibold text-slate-700">Grafik Kehadiran Kosong</p>
-            <p className="text-xs text-slate-500 max-w-sm mt-1">
-              Belum ada absensi yang diinput pada tanggal {formatDateId(date || data?.date)}.
-            </p>
-            {data?.latest_date && data.latest_date !== (date || data?.date) && (
-              <Button
-                variant="outline"
-                size="sm"
-                className="mt-4 text-xs bg-white border-slate-300 hover:bg-slate-50 text-slate-800"
-                onClick={() => setDate(data.latest_date!)}
-              >
-                Tampilkan Data Terakhir ({formatDateId(data.latest_date)})
-              </Button>
-            )}
-          </div>
         ) : (
-          <div className="h-72 w-full min-w-0" style={{ width: "100%", height: 288, minWidth: 0, minHeight: 288 }}>
-            <ResponsiveContainer
-              width="100%"
-              height="100%"
-              minWidth={0}
-              minHeight={200}
-              initialDimension={{ width: 500, height: 288 }}
-            >
-              <BarChart data={chartData} margin={{ top: 8, right: 8, left: -16, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
-                <XAxis dataKey="name" tick={{ fontSize: 12, fill: "#64748b" }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fontSize: 12, fill: "#64748b" }} axisLine={false} tickLine={false} allowDecimals={false} />
-                <Tooltip
-                  formatter={(val: any, name: any) => [val, STATUS_CONFIG[name]?.label || name]}
-                  contentStyle={{ borderRadius: 10, border: "1px solid #e2e8f0", fontSize: 12, boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)" }}
-                />
-                {STATUSES.map((s) => (
-                  <Bar
-                    key={s}
-                    dataKey={s}
-                    name={s}
-                    stackId="a"
-                    fill={STATUS_CONFIG[s].hex}
-                    radius={s === "DL" ? [4, 4, 0, 0] : 0}
-                  />
-                ))}
-              </BarChart>
-            </ResponsiveContainer>
+          <div className="grid grid-cols-1 items-stretch gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {(data?.per_team || []).map((t) => (
+              <Card key={t.team.id} data-testid={`team-card-${t.team.code}`} className="flex h-full flex-col border-slate-200 p-5 transition-all hover:shadow-sm">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-red-50 text-red-600">
+                      <Flame className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <p className="font-heading font-bold text-slate-900">{t.team.name}</p>
+                      <p className="text-xs text-slate-500">
+                        {t.members} anggota · ⭐ {t.commander_name || "—"}
+                      </p>
+                      {t.current_commander_name && t.current_commander_name !== t.commander_name && (
+                        <p className="text-[11px] text-slate-400 mt-0.5">
+                          Saat ini: ⭐ {t.current_commander_name}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+                <div className="mt-4 grid flex-1 grid-cols-3 items-stretch gap-2">
+                  {STATUSES.map((s) => (
+                    <div key={s} className={`flex flex-col items-center justify-center rounded-lg border p-2 text-center transition-transform ${STATUS_CONFIG[s].badge}`}>
+                      <p className="text-lg font-extrabold leading-none">{t[s] ?? 0}</p>
+                      <p className="text-[10px] font-semibold mt-1">{s}</p>
+                    </div>
+                  ))}
+                </div>
+              </Card>
+            ))}
           </div>
         )}
         </Card>
 
         {/* Monthly leaderboard */}
-        <Card className="border-slate-200 p-5">
+        <Card className="flex h-full flex-col border-slate-200 p-5">
           <div className="mb-4 flex items-center justify-between gap-3">
             <div>
               <h3 className="font-heading text-base font-bold text-slate-800">Leaderboard Regu Bulan ini</h3>
@@ -430,24 +413,23 @@ export default function Dashboard() {
             </div>
             <Flame className="h-5 w-5 shrink-0 text-amber-500" />
           </div>
-
           {showSkeleton ? (
-            <div className="space-y-2">
-              {[1, 2, 3].map((rank) => (
-                <Skeleton key={rank} className="h-12 w-full" />
+            <div className="flex flex-1 flex-col gap-2">
+              {[1, 2, 3, 4, 5, 6].map((rank) => (
+                <Skeleton key={rank} className="h-12 min-h-12 w-full flex-1" />
               ))}
             </div>
           ) : (data?.monthly_leaderboard?.length ?? 0) === 0 ? (
-            <p className="rounded-lg border border-dashed border-slate-200 bg-slate-50 p-4 text-center text-sm text-slate-500">
+            <p className="flex flex-1 items-center justify-center rounded-lg border border-dashed border-slate-200 bg-slate-50 p-4 text-center text-sm text-slate-500">
               Belum ada data leaderboard bulan ini.
             </p>
           ) : (
-            <div className="space-y-2">
+            <div className="flex flex-1 flex-col gap-3">
               {data?.monthly_leaderboard?.map((item, index) => (
                 <div
                   key={item.team.id}
                   data-testid={`monthly-leaderboard-${item.team.code}`}
-                  className="flex items-center gap-3 rounded-lg border border-slate-200 bg-slate-50/60 px-3 py-2.5"
+                  className="flex min-h-12 flex-1 items-center gap-3 rounded-lg border border-slate-200 bg-slate-50/60 px-3 py-2.5"
                 >
                   <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-extrabold ${
                     index === 0
@@ -472,70 +454,6 @@ export default function Dashboard() {
             </div>
           )}
         </Card>
-      </div>
-
-      {/* Per team cards */}
-      <div>
-        <div className="flex items-center justify-between mb-3">
-          <h3 className="font-heading text-base font-bold text-slate-800">Statistik per Regu</h3>
-          {!loading && (data?.per_team?.length ?? 0) > 0 && (
-            <span className="text-xs text-slate-500">{data?.per_team?.length} Regu Operasional</span>
-          )}
-        </div>
-
-        {showSkeleton ? (
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {[1, 2, 3, 4, 5, 6].map((i) => (
-              <Card key={i} className="border-slate-200 p-5">
-                <div className="flex items-center gap-3">
-                  <Skeleton className="h-9 w-9 rounded-lg" />
-                  <div className="space-y-1.5 flex-1">
-                    <Skeleton className="h-4 w-32" />
-                    <Skeleton className="h-3 w-44" />
-                  </div>
-                </div>
-                <div className="mt-4 grid grid-cols-3 gap-2">
-                  {[1, 2, 3, 4, 5, 6].map((j) => (
-                    <Skeleton key={j} className="h-12 rounded-lg" />
-                  ))}
-                </div>
-              </Card>
-            ))}
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {(data?.per_team || []).map((t) => (
-              <Card key={t.team.id} data-testid={`team-card-${t.team.code}`} className="border-slate-200 p-5 transition-all hover:shadow-sm">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-red-50 text-red-600">
-                      <Flame className="h-5 w-5" />
-                    </div>
-                    <div>
-                      <p className="font-heading font-bold text-slate-900">{t.team.name}</p>
-                      <p className="text-xs text-slate-500">
-                        {t.members} anggota · ⭐ {t.commander_name || "—"}
-                      </p>
-                      {t.current_commander_name && t.current_commander_name !== t.commander_name && (
-                        <p className="text-[11px] text-slate-400 mt-0.5">
-                          Saat ini: ⭐ {t.current_commander_name}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                </div>
-                <div className="mt-4 grid grid-cols-3 gap-2">
-                  {STATUSES.map((s) => (
-                    <div key={s} className={`rounded-lg border p-2 text-center transition-transform ${STATUS_CONFIG[s].badge}`}>
-                      <p className="text-lg font-extrabold leading-none">{t[s] ?? 0}</p>
-                      <p className="text-[10px] font-semibold mt-1">{s}</p>
-                    </div>
-                  ))}
-                </div>
-              </Card>
-            ))}
-          </div>
-        )}
       </div>
     </div>
   );
