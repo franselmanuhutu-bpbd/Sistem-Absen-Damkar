@@ -154,7 +154,7 @@ export default function AbsensiKasubid() {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 className="font-heading text-2xl font-bold text-slate-900">Absensi Kasubid</h2>
-          <p className="text-sm text-slate-500">Input absensi khusus pejabat Kasubid yang sedang aktif.</p>
+          <p className="text-sm text-slate-500">Input absensi khusus pejabat Kasubid aktif.</p>
         </div>
         <div className="flex items-center gap-2">
           <label className="text-sm font-medium text-slate-600 shrink-0">Tanggal</label>
