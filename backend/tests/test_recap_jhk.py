@@ -53,11 +53,13 @@ async def _async_test_compute_recap():
         assert rows["e1"]["OFF"] == 5
         assert rows["e1"]["jumlah_hari_kerja"] == 25
         assert rows["e1"]["total_kehadiran"] == 20
+        assert rows["e1"]["persentase_kehadiran"] == 80.0
 
         # e2: 30 days in April - 0 OFF = 30
         assert rows["e2"]["OFF"] == 0
         assert rows["e2"]["jumlah_hari_kerja"] == 30
         assert rows["e2"]["total_kehadiran"] == 25
+        assert rows["e2"]["persentase_kehadiran"] == round(25 / 30 * 100, 2)
 
         # Check breakdown
         bd_e1 = [b for b in result["breakdown"] if b["employee_id"] == "e1"]
@@ -104,7 +106,9 @@ async def _async_test_compute_kasubid_recap():
         assert k1["OFF"] == 4
         assert k1["jumlah_hari_kerja"] == 26
         assert k1["total_kehadiran"] == 20
+        assert k1["persentase_kehadiran"] == round(20 / 26 * 100, 2)
         assert k1["monthly"][0]["jumlah_hari_kerja"] == 26
+        assert k1["monthly"][0]["persentase_kehadiran"] == round(20 / 26 * 100, 2)
 
 
 def test_export_excel_and_pdf():
@@ -170,4 +174,3 @@ async def _async_test_export_excel_and_pdf():
 
         res_k_pdf = await export_kasubid_pdf("2026-04", "2026-04", user={"role": "admin"})
         assert res_k_pdf.status_code == 200
-

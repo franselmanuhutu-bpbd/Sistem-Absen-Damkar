@@ -142,7 +142,7 @@ export default function RekapKasubid() {
                   Jumlah Hari Kerja: <span className="font-bold text-slate-900">{p.jumlah_hari_kerja ?? data?.jumlah_hari_kerja ?? 0}</span>
                 </span>
                 <span className="text-slate-500">
-                  Total Kehadiran: <span className="font-bold text-slate-900">{p.total_kehadiran ?? p.HDR ?? 0}</span>
+                  Persentase Kehadiran: <span className="font-bold text-slate-900">{Number(p.persentase_kehadiran ?? 0).toFixed(2)}%</span>
                 </span>
               </div>
             </Card>

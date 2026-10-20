@@ -30,6 +30,10 @@ def sanitize_excel_cell(v):
     return v
 
 
+def percentage_label(hdr, days):
+    return f"{(hdr / days * 100):.2f}%" if days else "0.00%"
+
+
 @router.get("/export/excel")
 async def export_excel(
     start: str,
@@ -75,7 +79,7 @@ async def export_excel(
 
     ws = wb.active
     ws.title = "Ringkasan"
-    cols = ["No", "NIP", "Nama", "Regu", "Kategori", "Jabatan"] + STATUSES + ["Jumlah Hari Kerja", "Total Kehadiran"]
+    cols = ["No", "NIP", "Nama", "Regu", "Kategori", "Jabatan"] + STATUSES + ["Jumlah Hari Kerja", "Persentase Kehadiran"]
     ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=len(cols))
     ws.cell(row=1, column=1, value=f"{KOP['l1']} {KOP['l2']} \u2014 {KOP['l3']}").font = title_font
     ws.cell(row=1, column=1).alignment = center
@@ -92,7 +96,7 @@ async def export_excel(
     style_header(ws, hr, len(cols))
     r = hr + 1
     for row in data["rows"]:
-        vals = [row["no"], row["nip"], row["nama"], row["regu"], row["category"], row["jabatan"]] + [row[s] for s in STATUSES] + [row["jumlah_hari_kerja"], row["total_kehadiran"]]
+        vals = [row["no"], row["nip"], row["nama"], row["regu"], row["category"], row["jabatan"]] + [row[s] for s in STATUSES] + [row["jumlah_hari_kerja"], percentage_label(row["HDR"], row["jumlah_hari_kerja"])]
         for i, v in enumerate(vals, 1):
             cell = ws.cell(row=r, column=i, value=sanitize_excel_cell(v))
             cell.border = border
@@ -120,7 +124,8 @@ async def export_excel(
     cell_jhk.font = data_font_bold
     cell_jhk.alignment = center
     cell_jhk.border = border
-    cell_hdr = ws.cell(row=r, column=len(cols), value=data["grand_total"]["HDR"])
+    total_days = sum(row.get("jumlah_hari_kerja", 0) for row in data["rows"])
+    cell_hdr = ws.cell(row=r, column=len(cols), value=percentage_label(data["grand_total"]["HDR"], total_days))
     cell_hdr.font = data_font_bold
     cell_hdr.alignment = center
     cell_hdr.border = border
@@ -130,13 +135,13 @@ async def export_excel(
 
     if include_breakdown and len(data["breakdown"]) > 0:
         wb2 = wb.create_sheet("Breakdown Bulanan")
-        bcols = ["No", "Nama", "Regu", "Bulan"] + STATUSES + ["Jumlah Hari Kerja", "Total Kehadiran"]
+        bcols = ["No", "Nama", "Regu", "Bulan"] + STATUSES + ["Jumlah Hari Kerja", "Persentase Kehadiran"]
         for i, c in enumerate(bcols, 1):
             wb2.cell(row=1, column=i, value=c)
         style_header(wb2, 1, len(bcols))
         rr = 2
         for b in data["breakdown"]:
-            vals = [b["no"], b["nama"], b["regu"], b["month_label"]] + [b[s] for s in STATUSES] + [b["jumlah_hari_kerja"], b["total_kehadiran"]]
+            vals = [b["no"], b["nama"], b["regu"], b["month_label"]] + [b[s] for s in STATUSES] + [b["jumlah_hari_kerja"], percentage_label(b["HDR"], b["jumlah_hari_kerja"])]
             for i, v in enumerate(vals, 1):
                 c = wb2.cell(row=rr, column=i, value=sanitize_excel_cell(v))
                 c.border = border
@@ -329,8 +334,9 @@ async def export_pdf(
     if include_summary:
         elements.append(Paragraph("RINGKASAN PERIODE", sec_style))
         gt = data["grand_total"]
-        sum_header = [Paragraph("Total Pegawai", table_header_style)] + [Paragraph(STATUS_LABEL[s], table_header_style) for s in STATUSES] + [Paragraph("Total Kehadiran", table_header_style)]
-        sum_row = [Paragraph(str(data["total_pegawai"]), table_cell_center_bold)] + [Paragraph(str(gt[s]), table_cell_center_bold) for s in STATUSES] + [Paragraph(str(gt["HDR"]), table_cell_center_bold)]
+        sum_header = [Paragraph("Total Pegawai", table_header_style)] + [Paragraph(STATUS_LABEL[s], table_header_style) for s in STATUSES] + [Paragraph("Persentase Kehadiran", table_header_style)]
+        total_days = sum(row.get("jumlah_hari_kerja", 0) for row in data["rows"])
+        sum_row = [Paragraph(str(data["total_pegawai"]), table_cell_center_bold)] + [Paragraph(str(gt[s]), table_cell_center_bold) for s in STATUSES] + [Paragraph(percentage_label(gt["HDR"], total_days), table_cell_center_bold)]
         st = Table([sum_header, sum_row], repeatRows=1)
         st.setStyle(TableStyle([
             ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#94A3B8")),
@@ -344,7 +350,7 @@ async def export_pdf(
         elements.append(Spacer(1, 8))
 
         elements.append(Paragraph("REKAP PER PEGAWAI", sec_style))
-        header = ["No", "NIP", "Nama", "Regu", "Kategori", "Jabatan"] + STATUSES + ["Jumlah Hari Kerja", "Total Kehadiran"]
+        header = ["No", "NIP", "Nama", "Regu", "Kategori", "Jabatan"] + STATUSES + ["Jumlah Hari Kerja", "Persentase Kehadiran"]
         table_data = [[Paragraph(str(value), table_header_style) for value in header]]
         for row in data["rows"]:
             cells = [
@@ -361,7 +367,7 @@ async def export_pdf(
             ]
             cells += [
                 Paragraph(str(row["jumlah_hari_kerja"]), table_cell_center_bold),
-                Paragraph(str(row["total_kehadiran"]), table_cell_center_bold),
+                Paragraph(percentage_label(row["HDR"], row["jumlah_hari_kerja"]), table_cell_center_bold),
             ]
             table_data.append(cells)
 
@@ -373,7 +379,7 @@ async def export_pdf(
             for s in STATUSES
         ] + [
             Paragraph(str(sum(row.get("jumlah_hari_kerja", 0) for row in data["rows"])), table_cell_center_bold),
-            Paragraph(str(data["grand_total"]["HDR"]), table_cell_center_bold),
+            Paragraph(percentage_label(data["grand_total"]["HDR"], total_days), table_cell_center_bold),
         ]
         table_data.append(total_row)
         
@@ -400,7 +406,7 @@ async def export_pdf(
 
     if include_breakdown and len(data["breakdown"]) > 0:
         elements.append(Paragraph("BREAKDOWN BULANAN (mengikuti histori regu per bulan)", sec_style))
-        header = ["No", "Nama", "Regu", "Bulan"] + STATUSES + ["Jumlah Hari Kerja", "Total Kehadiran"]
+        header = ["No", "Nama", "Regu", "Bulan"] + STATUSES + ["Jumlah Hari Kerja", "Persentase Kehadiran"]
         bd = [[Paragraph(str(value), table_header_style) for value in header]]
         for b in data["breakdown"]:
             cells = [
@@ -415,7 +421,7 @@ async def export_pdf(
             ]
             cells += [
                 Paragraph(str(b["jumlah_hari_kerja"]), table_cell_center_bold),
-                Paragraph(str(b["total_kehadiran"]), table_cell_center_bold),
+                Paragraph(percentage_label(b["HDR"], b["jumlah_hari_kerja"]), table_cell_center_bold),
             ]
             bd.append(cells)
         colw = [8 * mm, 56 * mm, 26 * mm, 30 * mm] + [13 * mm] * 6 + [20 * mm, 20 * mm]
@@ -515,11 +521,11 @@ async def export_kasubid_excel(
 
     ws = wb.active
     ws.title = "Ringkasan Kasubid"
-    cols = ["No", "Nama", "Posisi"] + STATUSES + ["Jumlah Hari Kerja", "Total Kehadiran"]
+    cols = ["No", "Nama", "Posisi"] + STATUSES + ["Jumlah Hari Kerja", "Persentase Kehadiran"]
     head(ws, cols)
     r = 2
     for i, p in enumerate(data["positions"], 1):
-        vals = [i, p["nama"], p["label"]] + [p[s] for s in STATUSES] + [p["jumlah_hari_kerja"], p["total_kehadiran"]]
+        vals = [i, p["nama"], p["label"]] + [p[s] for s in STATUSES] + [p["jumlah_hari_kerja"], percentage_label(p["HDR"], p["jumlah_hari_kerja"])]
         for j, v in enumerate(vals, 1):
             c = ws.cell(row=r, column=j, value=sanitize_excel_cell(v))
             c.border = border
@@ -550,7 +556,9 @@ async def export_kasubid_excel(
     c_jhk.font = data_font_bold
     c_jhk.alignment = center
     c_jhk.border = border
-    c_hdr = ws.cell(row=r, column=11, value=sum(p["total_kehadiran"] for p in data["positions"]))
+    total_days = sum(p.get("jumlah_hari_kerja", 0) for p in data["positions"])
+    total_hdr = sum(p["HDR"] for p in data["positions"])
+    c_hdr = ws.cell(row=r, column=11, value=percentage_label(total_hdr, total_days))
     c_hdr.font = data_font_bold
     c_hdr.alignment = center
     c_hdr.border = border
@@ -564,12 +572,12 @@ async def export_kasubid_excel(
         ws.column_dimensions[col].width = 18
 
     ws2 = wb.create_sheet("Detail Bulanan")
-    bcols = ["Nama", "Posisi", "Bulan"] + STATUSES + ["Jumlah Hari Kerja", "Total Kehadiran"]
+    bcols = ["Nama", "Posisi", "Bulan"] + STATUSES + ["Jumlah Hari Kerja", "Persentase Kehadiran"]
     head(ws2, bcols)
     r = 2
     for p in data["positions"]:
         for mo in p["monthly"]:
-            vals = [p["nama"], p["label"], mo["month_label"]] + [mo[s] for s in STATUSES] + [mo["jumlah_hari_kerja"], mo["total_kehadiran"]]
+            vals = [p["nama"], p["label"], mo["month_label"]] + [mo[s] for s in STATUSES] + [mo["jumlah_hari_kerja"], percentage_label(mo["HDR"], mo["jumlah_hari_kerja"])]
             for j, v in enumerate(vals, 1):
                 c = ws2.cell(row=r, column=j, value=sanitize_excel_cell(v))
                 c.border = border
@@ -728,7 +736,7 @@ async def export_kasubid_pdf(
         Paragraph(f"Periode: {data['period_label']}", sub),
         Spacer(1, 8)
     ]
-    header = ["No", "Nama", "Posisi"] + STATUSES + ["Jumlah Hari Kerja", "Total Kehadiran"]
+    header = ["No", "Nama", "Posisi"] + STATUSES + ["Jumlah Hari Kerja", "Persentase Kehadiran"]
     td = [[Paragraph(str(value), table_header_style) for value in header]]
     for i, p in enumerate(data["positions"], 1):
         cells = [
@@ -742,7 +750,7 @@ async def export_kasubid_pdf(
         ]
         cells += [
             Paragraph(str(p["jumlah_hari_kerja"]), table_cell_center_bold),
-            Paragraph(str(p["total_kehadiran"]), table_cell_center_bold),
+            Paragraph(percentage_label(p["HDR"], p["jumlah_hari_kerja"]), table_cell_center_bold),
         ]
         td.append(cells)
 
@@ -753,7 +761,7 @@ async def export_kasubid_pdf(
         for s in STATUSES
     ] + [
         Paragraph(str(sum(p.get("jumlah_hari_kerja", 0) for p in data["positions"])), table_cell_center_bold),
-        Paragraph(str(sum(p["total_kehadiran"] for p in data["positions"])), table_cell_center_bold),
+        Paragraph(percentage_label(sum(p["HDR"] for p in data["positions"]), sum(p.get("jumlah_hari_kerja", 0) for p in data["positions"])), table_cell_center_bold),
     ]
     td.append(total_row)
 
@@ -781,7 +789,7 @@ async def export_kasubid_pdf(
     if len(data["months"]) > 1:
         el.append(Spacer(1, 10))
         el.append(Paragraph("DETAIL BULANAN", sec_style))
-        b_header = ["Nama", "Posisi", "Bulan"] + STATUSES + ["Jumlah Hari Kerja", "Total Kehadiran"]
+        b_header = ["Nama", "Posisi", "Bulan"] + STATUSES + ["Jumlah Hari Kerja", "Persentase Kehadiran"]
         b_td = [[Paragraph(str(value), table_header_style) for value in b_header]]
         for p in data["positions"]:
             for mo in p["monthly"]:
@@ -793,7 +801,7 @@ async def export_kasubid_pdf(
                 b_cells += [Paragraph(str(mo[s]), status_cell_styles[s]) for s in STATUSES]
                 b_cells += [
                     Paragraph(str(mo["jumlah_hari_kerja"]), table_cell_center_bold),
-                    Paragraph(str(mo["total_kehadiran"]), table_cell_center_bold),
+                    Paragraph(percentage_label(mo["HDR"], mo["jumlah_hari_kerja"]), table_cell_center_bold),
                 ]
                 b_td.append(b_cells)
         b_colw = [70 * mm, 32 * mm, 28 * mm] + [14 * mm] * 6 + [20 * mm, 20 * mm]

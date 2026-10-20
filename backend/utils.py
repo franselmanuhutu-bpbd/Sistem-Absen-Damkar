@@ -42,6 +42,10 @@ def _period_label(start: str, end: str) -> str:
     return f"{_month_label(start)} \u2013 {_month_label(end)}"
 
 
+def _attendance_percentage(hdr: int, days: int) -> float:
+    return round((hdr / days) * 100, 2) if days else 0.0
+
+
 async def write_audit(user: dict, action: str, **extra):
     db = await get_db()
     doc = {
@@ -229,6 +233,7 @@ async def _compute_recap(start_month: str, end_month: str, team_id: Optional[str
             "team_ids": team_ids_ordered, "regu": regu_label,
             **counts, "total": total, "jumlah_hari_kerja": emp_jhk,
             "total_kehadiran": counts["HDR"],
+            "persentase_kehadiran": _attendance_percentage(counts["HDR"], emp_jhk),
         })
         emp_breaks = sorted([(k, v) for k, v in mt.items() if k[0] == eid], key=lambda kv: (kv[0][2], kv[0][1] or ""))
         for (ee, tid, mo), cc in emp_breaks:
@@ -241,6 +246,7 @@ async def _compute_recap(start_month: str, end_month: str, team_id: Optional[str
                 **cc, "total": sum(cc.values()),
                 "jumlah_hari_kerja": mo_jhk,
                 "total_kehadiran": cc["HDR"],
+                "persentase_kehadiran": _attendance_percentage(cc["HDR"], mo_jhk),
             })
     return {
         "months": months, "rows": rows, "breakdown": breakdown, "grand_total": grand,
@@ -311,11 +317,16 @@ async def _compute_kasubid_recap(start_month: str, end_month: str):
             **counts,
             "jumlah_hari_kerja": pos_jhk,
             "total_kehadiran": counts["HDR"],
+            "persentase_kehadiran": _attendance_percentage(counts["HDR"], pos_jhk),
             "total": sum(counts.values()),
             "monthly": [{
                 "month": m, "month_label": _month_label(m), **monthly[m],
                 "jumlah_hari_kerja": max(0, last_day_of_month(int(m[:4]), int(m[5:7])) - monthly[m].get("OFF", 0)),
                 "total_kehadiran": monthly[m]["HDR"],
+                "persentase_kehadiran": _attendance_percentage(
+                    monthly[m]["HDR"],
+                    max(0, last_day_of_month(int(m[:4]), int(m[5:7])) - monthly[m].get("OFF", 0)),
+                ),
                 "total": sum(monthly[m].values()),
             } for m in months],
         })

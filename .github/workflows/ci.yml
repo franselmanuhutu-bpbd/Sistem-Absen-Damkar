@@ -61,7 +61,7 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Detect Tauro Version Changes
+      - name: Detect Tauri Version Changes
         id: version_check
         shell: bash
         run: |

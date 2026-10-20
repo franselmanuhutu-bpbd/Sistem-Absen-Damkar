@@ -130,6 +130,13 @@ export default function RekapPeriode() {
     return matchName || matchNip;
   });
 
+  const totalWorkingDays = filteredRows
+    .reduce((total: number, r: any) => total + (r.jumlah_hari_kerja || 0), 0);
+
+  const attendanceRatio = totalWorkingDays
+    ? (displayGrand.HDR || 0) / totalWorkingDays
+    : 0;
+
   return (
     <div className="space-y-5">
       <div>
@@ -307,6 +314,7 @@ export default function RekapPeriode() {
                             </TooltipProvider>
                           </div>
                         </th>
+                        <th className="px-3 py-3">Persentase Kehadiran</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -322,6 +330,7 @@ export default function RekapPeriode() {
                               <span className={r[s] > 0 ? STATUS_CONFIG[s].text : "text-slate-300"}>{r[s]}</span>
                             </td>))}
                           <td className="px-3 py-2.5 text-center font-extrabold text-slate-700">{r.jumlah_hari_kerja}</td>
+                          <td className="px-3 py-2.5 text-center font-semibold text-slate-700">{Number(r.persentase_kehadiran ?? 0).toFixed(2)}%</td>
                         </tr>
                       ))}
                       {filteredRows.length === 0 && (
@@ -335,8 +344,13 @@ export default function RekapPeriode() {
                     <tfoot>
                       <tr className="bg-slate-100 font-bold">
                         <td className="px-3 py-3" colSpan={5}>TOTAL ({filteredRows.length}{search ? ` dari ${data?.total_pegawai || 0}` : ""} pegawai)</td>
-                        {STATUSES.map((s) => <td key={s} className="px-2 py-3 text-center">{displayGrand[s] ?? 0}</td>)}
-                        <td className="px-3 py-3 text-center">{filteredRows.reduce((a: number, r: any) => a + (r.jumlah_hari_kerja || 0), 0)}</td>
+                          {STATUSES.map((s) => <td key={s} className="px-2 py-3 text-center">{displayGrand[s] ?? 0}</td>)}
+                        <td className="px-3 py-3 text-center">
+                          {filteredRows.reduce((a: number, r: any) => a + (r.jumlah_hari_kerja || 0), 0)}
+                        </td>
+                        <td className="px-3 py-3 text-center">
+                          {attendanceRatio.toFixed(2)}%
+                        </td>
                       </tr>
                     </tfoot>
                   </table>

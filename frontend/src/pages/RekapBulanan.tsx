@@ -84,6 +84,12 @@ export default function RekapBulanan() {
   }, {});
 
   const displayGrand = search.trim() ? filteredGrand : g;
+  const totalWorkingDays = filteredRows
+    .reduce((total: number, r: any) => total + (r.jumlah_hari_kerja || 0), 0);
+
+  const attendanceRatio = totalWorkingDays
+    ? (displayGrand.HDR || 0) / totalWorkingDays
+    : 0;
 
   return (
     <div className="space-y-5">
@@ -183,7 +189,7 @@ export default function RekapBulanan() {
                   <th className="hidden px-3 py-3 lg:table-cell">Jabatan</th>
                   {STATUSES.map((s) => <th key={s} className="px-2 py-3 text-center">{s}</th>)}
                   <th className="px-3 py-3 text-center">
-                    <div className="inline-flex items-center justify-center gap-1.5">
+                    <div className="inline-flex items-center justify-center">
                       <span>Jumlah Hari Kerja</span>
                       <TooltipProvider delayDuration={150}>
                         <Tooltip>
@@ -209,6 +215,7 @@ export default function RekapBulanan() {
                       </TooltipProvider>
                     </div>
                   </th>
+                  <th className="px-3 py-3 text-center">Persentase Kehadiran</th>
                 </tr>
               </thead>
               <tbody>
@@ -226,6 +233,8 @@ export default function RekapBulanan() {
                       </td>
                     ))}
                     <td className="px-3 py-2.5 text-center font-semibold text-slate-700">{r.jumlah_hari_kerja}</td>
+                    <td className="px-3 py-2.5 text-center font-semibold text-slate-700">{Number(r.persentase_kehadiran ?? 0).toFixed(2)}%</td>
+
                   </tr>
                 ))}
                 {filteredRows.length === 0 && (
@@ -240,10 +249,15 @@ export default function RekapBulanan() {
                 <tr className="bg-slate-100 font-bold text-slate-800">
                   <td className="px-3 py-3" colSpan={5}>TOTAL ({filteredRows.length}{search ? ` dari ${data?.total_pegawai || 0}` : ""} pegawai)</td>
                   <td className="hidden lg:table-cell" />
-                  {STATUSES.map((s) => (
-                    <td key={s} className="px-2 py-3 text-center">{displayGrand[s] ?? 0}</td>
-                  ))}
-                  <td className="px-3 py-3 text-center">{filteredRows.reduce((a: number, r: any) => a + (r.jumlah_hari_kerja || 0), 0)}</td>
+                    {STATUSES.map((s) => (
+                      <td key={s} className="px-2 py-3 text-center">{displayGrand[s] ?? 0}</td>
+                    ))}
+                  <td className="px-3 py-3 text-center">
+                    {filteredRows.reduce((a: number, r: any) => a + (r.jumlah_hari_kerja || 0), 0)}
+                  </td>
+                  <td className="px-3 py-3 text-center">
+                    {attendanceRatio.toFixed(2)}%
+                  </td>
                 </tr>
               </tfoot>
             </table>
