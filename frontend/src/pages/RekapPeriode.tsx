@@ -59,13 +59,13 @@ export default function RekapPeriode() {
   const applyQuick = (k) => {
     setQuick(k);
 
-    if (k == 1) {
-      setStart(addMonths(curMonth, 0));
-    } else if (k > 1) {
-      setStart(addMonths(curMonth, -2));
-      setEnd(addMonths(start, k - 1))
+    if (k > 0) {
+      const nextStart = addMonths(curMonth, -(k - 1));
+      setStart(nextStart);
+      setEnd(curMonth);
     }
   };
+
   const onStart = (v) => {
     setStart(v);
     if (quick > 0) setEnd(addMonths(v, quick - 1));
